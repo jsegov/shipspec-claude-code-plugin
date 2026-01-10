@@ -19,7 +19,7 @@ cat docs/planning/$ARGUMENTS/context.md 2>/dev/null || echo "No context file fou
 
 Look at the recent conversation for requirements that were gathered. The user should have just finished a requirements gathering session with the prd-gatherer agent.
 
-If no requirements are apparent in the conversation, ask the user to run `/plan $ARGUMENTS` first.
+If no requirements are apparent in the conversation, ask the user to run `/feature $ARGUMENTS` first.
 
 ## Step 3: Generate PRD
 

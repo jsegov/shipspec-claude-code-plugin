@@ -36,7 +36,7 @@ AI-assisted feature planning and production readiness for Claude Code. Transform
 
 ```bash
 # Start planning a new feature
-/plan my-feature
+/feature my-feature
 
 # Generate PRD after requirements gathering
 /generate-prd my-feature
@@ -55,7 +55,7 @@ AI-assisted feature planning and production readiness for Claude Code. Transform
 
 1. **Start Planning**
    ```
-   /plan user-authentication
+   /feature user-authentication
    ```
    This will:
    - Create `docs/planning/user-authentication/` directory
@@ -155,7 +155,7 @@ docs/planning/your-feature/
 
 | Command | Description |
 |---------|-------------|
-| `/plan <name>` | Start planning workflow |
+| `/feature <name>` | Start planning workflow |
 | `/generate-prd <name>` | Generate PRD from conversation |
 | `/generate-sdd <name>` | Generate design from PRD |
 | `/generate-tasks <name>` | Generate tasks from PRD + SDD |
@@ -237,7 +237,7 @@ Production analysis covers six categories:
 
 ## Tips
 
-- **Start with `/plan`**: Don't skip requirements gathering
+- **Start with `/feature`**: Don't skip requirements gathering
 - **Review each document**: Make adjustments before moving to the next phase
 - **Use the context**: The codebase analysis helps generate better designs
 - **Follow the phases**: Tasks are ordered by dependency
