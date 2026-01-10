@@ -10,10 +10,10 @@ Create structured task prompts that coding agents can execute effectively.
 
 ## Task Prompt Template
 
-Each task should include this structure:
+Each task should include this structure. Note the checkbox format `- [ ]` in the header for status tracking:
 
 ```markdown
-# Task: [TASK-XXX] [Clear, Action-Oriented Title]
+### - [ ] TASK-XXX: [Clear, Action-Oriented Title]
 
 ## Context
 [2-3 sentences explaining where this task fits in the larger system and why it matters]
@@ -116,28 +116,38 @@ When generating tasks, identify:
    - The longest chain of dependent tasks
    - Determines minimum project duration
 
+## Task Status Tracking
+
+Tasks use checkbox format in the header for status tracking:
+
+| Status | Format | Meaning |
+|--------|--------|---------|
+| Not Started | `### - [ ] TASK-XXX:` | Ready to implement |
+| In Progress | `### - [~] TASK-XXX:` | Currently being worked on |
+| Completed | `### - [x] TASK-XXX:` | Done and verified |
+
 ## Execution Phases
 
 Group tasks into logical phases:
 
 ```markdown
 ### Phase 1: Foundation
-- TASK-001: Database schema
-- TASK-002: Base types and interfaces
+- [ ] TASK-001: Database schema
+- [ ] TASK-002: Base types and interfaces
 [These must complete first]
 
 ### Phase 2: Core Implementation
-- TASK-003: API endpoints (depends on 001, 002)
-- TASK-004: Service layer (depends on 001, 002)
+- [ ] TASK-003: API endpoints (depends on 001, 002)
+- [ ] TASK-004: Service layer (depends on 001, 002)
 [Can be parallelized]
 
 ### Phase 3: UI Layer
-- TASK-005: Components (depends on 003)
-- TASK-006: Pages (depends on 005)
+- [ ] TASK-005: Components (depends on 003)
+- [ ] TASK-006: Pages (depends on 005)
 
 ### Phase 4: Polish
-- TASK-007: Tests (depends on 003, 004, 005)
-- TASK-008: Documentation (depends on all)
+- [ ] TASK-007: Tests (depends on 003, 004, 005)
+- [ ] TASK-008: Documentation (depends on all)
 ```
 
 ## Output Format for Task List
@@ -160,10 +170,17 @@ When generating a complete task list:
 | REQ-002 | TASK-002, TASK-004 |
 
 ## Phase 1: [Phase Name]
-[Task details...]
+
+### - [ ] TASK-001: [Title]
+[Full task prompt...]
+
+### - [ ] TASK-002: [Title]
+[Full task prompt...]
 
 ## Phase 2: [Phase Name]
-[Task details...]
+
+### - [ ] TASK-003: [Title]
+[Full task prompt...]
 ```
 
 ## Quality Checklist
@@ -181,15 +198,15 @@ Before finalizing tasks:
 
 ```
 Feature X
-├── TASK-001: Database schema/migrations (infrastructure)
-├── TASK-002: Type definitions and interfaces (infrastructure)
-├── TASK-003: API endpoint - create (feature)
-├── TASK-004: API endpoint - read (feature)
-├── TASK-005: API endpoint - update (feature)
-├── TASK-006: API endpoint - delete (feature)
-├── TASK-007: UI component - form (feature)
-├── TASK-008: UI component - list (feature)
-├── TASK-009: Unit tests (testing)
-├── TASK-010: Integration tests (testing)
-└── TASK-011: Documentation (documentation)
+├── - [ ] TASK-001: Database schema/migrations (infrastructure)
+├── - [ ] TASK-002: Type definitions and interfaces (infrastructure)
+├── - [ ] TASK-003: API endpoint - create (feature)
+├── - [ ] TASK-004: API endpoint - read (feature)
+├── - [ ] TASK-005: API endpoint - update (feature)
+├── - [ ] TASK-006: API endpoint - delete (feature)
+├── - [ ] TASK-007: UI component - form (feature)
+├── - [ ] TASK-008: UI component - list (feature)
+├── - [ ] TASK-009: Unit tests (testing)
+├── - [ ] TASK-010: Integration tests (testing)
+└── - [ ] TASK-011: Documentation (documentation)
 ```

@@ -90,17 +90,17 @@ Use the agent-prompts skill template for each task. Ensure:
 
 ```
 Feature X
-├── TASK-001: Database schema/migrations (infrastructure)
-├── TASK-002: Type definitions and interfaces (infrastructure)
-├── TASK-003: API endpoint - create (feature)
-├── TASK-004: API endpoint - read (feature)
-├── TASK-005: API endpoint - update (feature)
-├── TASK-006: API endpoint - delete (feature)
-├── TASK-007: UI component - form (feature)
-├── TASK-008: UI component - list (feature)
-├── TASK-009: Unit tests (testing)
-├── TASK-010: Integration tests (testing)
-└── TASK-011: Documentation (documentation)
+├── - [ ] TASK-001: Database schema/migrations (infrastructure)
+├── - [ ] TASK-002: Type definitions and interfaces (infrastructure)
+├── - [ ] TASK-003: API endpoint - create (feature)
+├── - [ ] TASK-004: API endpoint - read (feature)
+├── - [ ] TASK-005: API endpoint - update (feature)
+├── - [ ] TASK-006: API endpoint - delete (feature)
+├── - [ ] TASK-007: UI component - form (feature)
+├── - [ ] TASK-008: UI component - list (feature)
+├── - [ ] TASK-009: Unit tests (testing)
+├── - [ ] TASK-010: Integration tests (testing)
+└── - [ ] TASK-011: Documentation (documentation)
 ```
 
 ## Dependency Management
@@ -120,6 +120,11 @@ Schema → Types → API → Service → UI → Tests
 - Different test suites
 
 ## Output Format
+
+Use checkbox format for task headers to enable status tracking:
+- `- [ ]` = Not started
+- `- [~]` = In progress
+- `- [x]` = Completed
 
 ```markdown
 # Implementation Tasks: [Feature Name]
@@ -142,17 +147,17 @@ Schema → Types → API → Service → UI → Tests
 
 ## Phase 1: Foundation (X points)
 
-### TASK-001: [Title]
+### - [ ] TASK-001: [Title]
 [Full task prompt using template]
 
-### TASK-002: [Title]
+### - [ ] TASK-002: [Title]
 [Full task prompt using template]
 
 ---
 
 ## Phase 2: Core Implementation (Y points)
 
-### TASK-003: [Title]
+### - [ ] TASK-003: [Title]
 [Full task prompt using template]
 
 [Continue for all tasks...]
