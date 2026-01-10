@@ -1,0 +1,34 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "shipspec-marketplace",
+  "version": "1.0.0",
+  "description": "ShipSpec: AI-assisted feature planning, technical design, task decomposition, and production readiness analysis",
+  "owner": {
+    "name": "jsegov"
+  },
+  "plugins": [
+    {
+      "name": "shipspec",
+      "description": "AI-assisted feature planning and production readiness: conversational PRD gathering, technical design generation, task decomposition, and comprehensive code analysis for security, compliance, and deployment",
+      "version": "0.2.0",
+      "author": {
+        "name": "ShipSpec"
+      },
+      "source": ".",
+      "category": "development",
+      "homepage": "https://github.com/shipspec/planning-plugin",
+      "keywords": [
+        "planning",
+        "prd",
+        "design",
+        "tasks",
+        "agents",
+        "production",
+        "security",
+        "compliance",
+        "soc2",
+        "code-analysis"
+      ]
+    }
+  ]
+}
