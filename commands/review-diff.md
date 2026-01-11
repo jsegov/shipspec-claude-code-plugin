@@ -24,9 +24,9 @@ Validate implementation work against planning artifacts by checking acceptance c
 
 **Stop here** - do not proceed without an argument.
 
-## Step 1: Validate Prerequisites
+## Step 1: Validate Prerequisites and Detect Workflow
 
-Check that the planning directory exists and contains required artifacts:
+Check that the planning directory exists:
 
 ```bash
 echo "=== Checking planning directory ==="
@@ -34,21 +34,43 @@ ls -la .shipspec/planning/$ARGUMENTS/ 2>/dev/null || echo "DIRECTORY NOT FOUND"
 ```
 
 **If directory not found:**
-> "No planning directory found for '$ARGUMENTS'. Please run `/feature-planning $ARGUMENTS` first to create the planning artifacts."
+> "No planning directory found for '$ARGUMENTS'. Please run either:
+> - `/feature-planning $ARGUMENTS` - for new feature development
+> - `/productionalize $ARGUMENTS` - for production readiness analysis"
 
-Check for required files:
+**Detect workflow type:**
 ```bash
-echo "=== Checking required files ==="
+echo "=== Detecting workflow type ==="
+ls .shipspec/planning/$ARGUMENTS/PRD.md .shipspec/planning/$ARGUMENTS/SDD.md 2>/dev/null && echo "FEATURE_PLANNING"
+ls .shipspec/planning/$ARGUMENTS/production-report.md 2>/dev/null && echo "PRODUCTION_READINESS"
+```
+
+- If `PRD.md` and `SDD.md` exist → **Feature Planning** workflow (uses TASK-XXX IDs)
+- If `production-report.md` exists → **Production Readiness** workflow (uses FINDING-XXX IDs)
+- If neither → Error: "Directory exists but contains no recognized planning artifacts. Expected either PRD.md/SDD.md (feature planning) or production-report.md (production readiness)."
+
+**Check for TASKS.md (required for both workflows):**
+```bash
 ls .shipspec/planning/$ARGUMENTS/TASKS.md 2>/dev/null || echo "TASKS.md NOT FOUND"
+```
+
+**If TASKS.md not found:**
+> "No TASKS.md found in '.shipspec/planning/$ARGUMENTS/'.
+>
+> - For feature planning: Run `/feature-planning $ARGUMENTS` to complete the planning workflow.
+> - For production readiness: Run `/productionalize $ARGUMENTS` to generate remediation tasks."
+
+**For Feature Planning workflow only**, also verify PRD.md and SDD.md exist:
+```bash
+echo "=== Checking feature planning artifacts ==="
 ls .shipspec/planning/$ARGUMENTS/PRD.md 2>/dev/null || echo "PRD.md NOT FOUND"
 ls .shipspec/planning/$ARGUMENTS/SDD.md 2>/dev/null || echo "SDD.md NOT FOUND"
 ```
 
-**If any required file is missing:**
+**If Feature Planning and any artifact missing:**
 > "Missing required planning artifacts for '$ARGUMENTS':
 > - [List missing files]
 >
-> This command requires all three artifacts: TASKS.md, PRD.md, and SDD.md.
 > Run `/feature-planning $ARGUMENTS` to generate them."
 
 ## Step 2: Find In-Progress Task
@@ -108,15 +130,27 @@ Store the list of changed files for reference in validation steps.
 >
 > If you've already committed, you can still verify manually or use `/implement-next-task $ARGUMENTS` to check acceptance criteria."
 
-## Step 4: Load Planning Artifacts
+## Step 4: Load Planning Artifacts (Feature Planning Only)
 
-Load the PRD and SDD for reference:
+**For Feature Planning workflow**, load the PRD and SDD for reference:
 @.shipspec/planning/$ARGUMENTS/PRD.md
 @.shipspec/planning/$ARGUMENTS/SDD.md
 
+**For Production Readiness workflow**, skip this step - proceed directly to Step 5.
+
 ## Step 5: Validate Acceptance Criteria
 
-From the in-progress task, locate the `## Acceptance Criteria` section. For each criterion listed:
+From the in-progress task, locate the `## Acceptance Criteria` section.
+
+**If no Acceptance Criteria section found OR section is empty:**
+> "Warning: No acceptance criteria found in task. Cannot validate implementation without criteria.
+>
+> The task must have an `## Acceptance Criteria` section with at least one verifiable criterion.
+> Please add acceptance criteria to the task in TASKS.md and run this command again."
+
+**Mark validation as BLOCKED and stop** - do not proceed to verdict. A task without acceptance criteria cannot be auto-approved.
+
+**If Acceptance Criteria found**, for each criterion listed:
 
 ### Criterion Categories and Verification Methods
 
@@ -151,9 +185,11 @@ For each criterion:
 **Result:** X/Y criteria passed
 ```
 
-## Step 6: Validate Design Alignment
+## Step 6: Validate Design Alignment (Feature Planning Only)
 
-From the in-progress task, locate the `## References` section and find the `Design Doc: Section X.Y` reference.
+**For Production Readiness workflow**, skip this step entirely - mark as N/A and proceed to Step 7.
+
+**For Feature Planning workflow**, from the in-progress task, locate the `## References` section and find the `Design Doc: Section X.Y` reference.
 
 **If no design reference found:**
 > "Note: No Design Doc reference found in task. Skipping design alignment check."
@@ -189,9 +225,11 @@ For each relevant aspect, compare the git diff changes against the SDD section.
 **Result:** X/Y aspects verified
 ```
 
-## Step 7: Validate Requirements Coverage
+## Step 7: Validate Requirements Coverage (Feature Planning Only)
 
-From the in-progress task, locate the `## References` section and find PRD references (e.g., `PRD: REQ-001, REQ-005`).
+**For Production Readiness workflow**, skip this step entirely - mark as N/A and proceed to Step 8.
+
+**For Feature Planning workflow**, from the in-progress task, locate the `## References` section and find PRD references (e.g., `PRD: REQ-001, REQ-005`).
 
 **If no PRD references found:**
 > "Note: No PRD requirement references found in task. Skipping requirements coverage check."
@@ -245,14 +283,18 @@ Compile results from all three validation categories:
 **Determine overall verdict:**
 
 **APPROVED** (all validations pass):
-- All acceptance criteria passed
-- Design alignment verified (or N/A if no reference)
-- All requirements satisfied (or N/A if no reference)
+- All acceptance criteria passed (must have at least one criterion)
+- Design alignment verified (or N/A if no reference or Production Readiness workflow)
+- All requirements satisfied (or N/A if no reference or Production Readiness workflow)
 
 **NEEDS WORK** (any validation fails):
 - One or more acceptance criteria failed
 - OR design misalignment detected
 - OR requirements not satisfied
+
+**BLOCKED** (cannot determine verdict):
+- No acceptance criteria found in task
+- OR critical infrastructure missing (e.g., cannot run any verifications)
 
 ## Step 9: Take Action Based on Verdict
 
@@ -300,6 +342,21 @@ Compile results from all three validation categories:
 >
 > After fixing these issues, run `/review-diff $ARGUMENTS` again to validate."
 
+### If BLOCKED:
+
+1. Keep the task as `[~]` (do not update TASKS.md)
+
+2. Display blocking information:
+> "## BLOCKED
+>
+> Cannot complete review due to missing requirements.
+>
+> **Issue:** [Describe what's missing - e.g., no acceptance criteria]
+>
+> **Resolution:** [How to fix - e.g., add acceptance criteria to task in TASKS.md]
+>
+> After resolving the issue, run `/review-diff $ARGUMENTS` again."
+
 ## Edge Cases
 
 ### Tests Not Configured
@@ -317,17 +374,3 @@ If `npx tsc` fails:
 If task has incomplete references (e.g., "Design Doc: TBD"):
 - Skip that validation category
 - Note it as N/A in the summary
-
-### Mixed Workflow (FINDING-XXX)
-For Production Readiness workflow tasks:
-- No PRD.md or SDD.md expected
-- Only validate acceptance criteria
-- Skip design and requirements validation entirely
-- Detect workflow type the same way as implement-next-task command
-
-```bash
-echo "=== Detecting workflow type ==="
-ls .shipspec/planning/$ARGUMENTS/production-report.md 2>/dev/null && echo "PRODUCTION_READINESS"
-```
-
-If `production-report.md` exists, this is a Production Readiness workflow - skip Steps 6 and 7 entirely and only validate acceptance criteria.

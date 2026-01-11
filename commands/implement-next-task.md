@@ -48,6 +48,7 @@ ls .shipspec/planning/$ARGUMENTS/production-report.md 2>/dev/null && echo "PRODU
 
 - If `PRD.md` and `SDD.md` exist → **Feature Planning** workflow (uses TASK-XXX IDs)
 - If `production-report.md` exists → **Production Readiness** workflow (uses FINDING-XXX IDs)
+- If BOTH exist → **Production Readiness** workflow takes precedence (it's likely a recent analysis overlaid on an existing feature)
 - If neither → Error: "Directory exists but contains no recognized planning artifacts. Expected either PRD.md/SDD.md (feature planning) or production-report.md (production readiness)."
 
 **Check for TASKS.md:**
@@ -227,6 +228,3 @@ If dependency resolution detects a cycle:
 
 ### Empty Dependencies Field
 If a task has `Depends on: None` or no dependencies section, treat it as having no dependencies (ready if status is `[ ]`).
-
-### Mixed Workflow Artifacts
-If a directory contains both PRD.md/SDD.md AND production-report.md, prefer the production-report.md detection (production readiness workflow) since it's more likely to be the recent analysis overlaid on an existing feature.
