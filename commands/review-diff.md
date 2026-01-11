@@ -197,7 +197,20 @@ For each criterion:
 
 1. Extract the section reference (e.g., "Section 5.3" or "Section 7.1")
 2. Locate that section in SDD.md
-3. Verify the implementation aligns with the design:
+
+**If referenced section not found in SDD.md:**
+> "Warning: Task references 'Section X.Y' but this section was not found in SDD.md.
+>
+> This may indicate:
+> - The section number is incorrect in the task
+> - The SDD structure has changed
+> - The section was removed or renumbered
+>
+> Please verify the reference and update either the task or SDD.md."
+>
+> Mark design validation as **BLOCKED** (cannot validate against missing content).
+
+**If referenced section found**, verify the implementation aligns with the design:
 
 **Design Alignment Checks:**
 - **API Contracts**: Do endpoints/methods match the design?
@@ -237,7 +250,22 @@ For each relevant aspect, compare the git diff changes against the SDD section.
 
 1. Extract all REQ-XXX references from the task
 2. For each requirement, locate it in PRD.md
-3. Verify the implementation satisfies the requirement's "shall" statement:
+
+**If any referenced requirement not found in PRD.md:**
+> "Warning: Task references requirement(s) not found in PRD.md:
+> - [List missing REQ-XXX IDs]
+>
+> This may indicate:
+> - The requirement ID is incorrect in the task
+> - The PRD structure has changed
+> - The requirement was removed or renumbered
+>
+> Please verify the references and update either the task or PRD.md."
+>
+> Mark missing requirements as **CANNOT_VERIFY** and continue validating found requirements.
+> If ALL referenced requirements are missing, mark requirements validation as **BLOCKED**.
+
+**For each requirement found**, verify the implementation satisfies the requirement's "shall" statement:
    - Check if the functionality described is implemented
    - Look for evidence in the changed files
    - Verify testable aspects are covered
