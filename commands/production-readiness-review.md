@@ -1,7 +1,7 @@
 ---
 description: Analyze codebase for production readiness and generate remediation tasks
 argument-hint: <context-name>
-allowed-tools: Read, Glob, Grep, Write, Bash(git status), Bash(ls:*), Bash(mkdir:*), Bash(find:*), Bash(head:*), Bash(cat:*), Bash(wc:*), WebSearch, WebFetch
+allowed-tools: Read, Glob, Grep, Write, Bash(git status), Bash(ls:*), Bash(mkdir:*), Bash(rm:*), Bash(find:*), Bash(head:*), Bash(cat:*), Bash(wc:*), WebSearch, WebFetch
 ---
 
 # Production Readiness Review: $ARGUMENTS
