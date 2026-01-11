@@ -17,7 +17,7 @@ ls -la docs/planning/$ARGUMENTS/TASKS.md 2>/dev/null || echo "TASKS.md NOT FOUND
 ```
 
 If TASKS.md is not found, tell the user:
-> "No TASKS.md found for '$ARGUMENTS'. Please run `/generate-tasks $ARGUMENTS` first to create the task list."
+> "No TASKS.md found for '$ARGUMENTS'. Please run `/feature-planning $ARGUMENTS` first to complete the planning workflow and generate tasks."
 
 ## Step 2: Load and Parse Tasks
 

@@ -1,6 +1,8 @@
 # ShipSpec Planning Plugin
 
-AI-assisted feature planning and production readiness for Claude Code. Transform ideas into well-structured PRDs, technical designs, and implementation tasks. Analyze codebases for security vulnerabilities, compliance gaps, and production blockers.
+**Spec-driven development for Claude Code.** Plan features systematically before writing code—transform ideas into well-structured PRDs, technical designs, and implementation tasks. Analyze codebases for security vulnerabilities, compliance gaps, and production blockers.
+
+Spec-driven development ensures you think through requirements and architecture before implementation, resulting in better code, fewer rewrites, and clearer communication.
 
 ## Features
 
@@ -35,61 +37,50 @@ AI-assisted feature planning and production readiness for Claude Code. Transform
 ### Quick Start
 
 ```bash
-# Start planning a new feature
-/feature my-feature
+# Start planning a new feature (runs full workflow)
+/feature-planning my-feature
 
-# Generate PRD after requirements gathering
-/generate-prd my-feature
-
-# Generate technical design
-/generate-sdd my-feature
-
-# Generate implementation tasks
-/generate-tasks my-feature
+# Implement tasks one by one
+/implement-next-task my-feature
 
 # Analyze codebase for production readiness
 /productionalize my-analysis
 ```
 
-### Full Workflow
+### Full Feature Planning Workflow
 
-1. **Start Planning**
-   ```
-   /feature user-authentication
-   ```
-   This will:
-   - Create `docs/planning/user-authentication/` directory
-   - Extract codebase context
-   - Start a guided requirements conversation
+Run `/feature-planning <name>` to go through the complete planning workflow:
 
-2. **Gather Requirements**
-   The PRD Gatherer agent will ask questions about:
+```
+/feature-planning user-authentication
+```
+
+The command guides you through 6 phases:
+
+1. **Setup** - Creates `docs/planning/user-authentication/` and extracts codebase context
+
+2. **Requirements Gathering** - Interactive Q&A with the PRD Gatherer agent about:
    - The problem you're solving
    - Target users
    - Must-have vs nice-to-have features
    - Technical constraints
 
-3. **Generate PRD**
-   ```
-   /generate-prd user-authentication
-   ```
-   Creates a structured PRD with numbered requirements.
+3. **PRD Generation** - Creates structured PRD with numbered requirements
+   - *Pauses for your review and approval*
 
-4. **Generate Design**
-   ```
-   /generate-sdd user-authentication
-   ```
-   Creates a technical design document with:
+4. **Technical Decisions** - Interactive Q&A about:
+   - Infrastructure preferences (databases, caching, queues)
+   - Framework and library choices
+   - Deployment and scaling considerations
+
+5. **SDD Generation** - Creates technical design document with:
    - Architecture decisions
    - API specifications
    - Data models
    - Component designs
+   - *Pauses for your review and approval*
 
-5. **Generate Tasks**
-   ```
-   /generate-tasks user-authentication
-   ```
-   Creates implementation tasks with:
+6. **Task Generation** - Automatically creates implementation tasks with:
    - Story point estimates
    - Dependencies
    - Detailed agent prompts
@@ -141,7 +132,7 @@ AI-assisted feature planning and production readiness for Claude Code. Transform
 
 ## Output Structure
 
-After completing the workflow:
+After completing the feature planning workflow:
 
 ```
 docs/planning/your-feature/
@@ -155,10 +146,8 @@ docs/planning/your-feature/
 
 | Command | Description |
 |---------|-------------|
-| `/feature <name>` | Start planning workflow |
-| `/generate-prd <name>` | Generate PRD from conversation |
-| `/generate-sdd <name>` | Generate design from PRD |
-| `/generate-tasks <name>` | Generate tasks from PRD + SDD |
+| `/feature-planning <name>` | Run complete planning workflow (requirements → PRD → SDD → tasks) |
+| `/implement-next-task <name>` | Start/continue implementing tasks from TASKS.md |
 | `/productionalize <name>` | Analyze codebase for production readiness |
 
 ## Agents
@@ -168,6 +157,7 @@ docs/planning/your-feature/
 | `prd-gatherer` | Requirements elicitation | Planning features, writing specs |
 | `design-architect` | Technical design | Architecture decisions, API design |
 | `task-planner` | Task decomposition | Breaking down features |
+| `task-verifier` | Verify task completion | Running /implement-next-task |
 | `production-interviewer` | Production context gathering | Checking production readiness |
 | `production-analyzer` | Deep code analysis | Security/compliance analysis |
 | `production-reporter` | Report generation | Creating production reports |
@@ -237,10 +227,9 @@ Production analysis covers six categories:
 
 ## Tips
 
-- **Start with `/feature`**: Don't skip requirements gathering
-- **Review each document**: Make adjustments before moving to the next phase
-- **Use the context**: The codebase analysis helps generate better designs
-- **Follow the phases**: Tasks are ordered by dependency
+- **Use `/feature-planning` for full workflow**: Single command runs requirements → PRD → SDD → tasks
+- **Review at each gate**: The workflow pauses after PRD and SDD for your review
+- **Use `/implement-next-task` to work through tasks**: Tracks progress and verifies completion
 - **Run `/productionalize` before launch**: Catch security issues early
 - **Use fix prompts**: Copy prompts from fix-prompts.md to remediate issues quickly
 

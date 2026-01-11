@@ -167,4 +167,4 @@ Structure your design document following the 8-section Atlassian template. Ensur
 When complete, the design should be saved to:
 `docs/planning/[feature]/SDD.md`
 
-Suggest next step: `/generate-tasks [feature-name]`
+The workflow will automatically proceed to generate implementation tasks.

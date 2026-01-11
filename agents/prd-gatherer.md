@@ -105,7 +105,7 @@ When ready, say:
 > "I think we have a solid foundation for the PRD. Here's a summary of what we've gathered:
 > [Brief summary]
 >
-> Ready to generate the document? The user can run `/generate-prd [feature-name]` to create the PRD file."
+> Ready to proceed? I'll now generate the PRD document."
 
 ## Handoff Format
 
