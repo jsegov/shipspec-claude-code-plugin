@@ -14,9 +14,12 @@
       "author": {
         "name": "ShipSpec"
       },
-      "source": ".",
+      "source": {
+        "source": "url",
+        "url": "https://github.com/jsegov/shipspec-claude-code-plugin.git"
+      },
       "category": "development",
-      "homepage": "https://github.com/shipspec/planning-plugin",
+      "homepage": "https://github.com/jsegov/shipspec-claude-code-plugin",
       "keywords": [
         "planning",
         "prd",
