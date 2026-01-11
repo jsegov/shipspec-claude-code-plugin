@@ -1,94 +1,70 @@
 ---
 description: Start implementing the next available task from TASKS.md
-argument-hint: <directory-name>
+argument-hint: <feature-name>
 allowed-tools: Read, Glob, Grep, Write, Edit, Bash(cat:*), Bash(ls:*), Bash(find:*), Bash(npm:*), Bash(git:*), Bash(head:*), Bash(wc:*)
 ---
 
 # Implement Next Task: $ARGUMENTS
 
-Find and display the next task ready for implementation, verifying any in-progress work first. Supports both feature-planning (TASK-XXX) and production-readiness-review (FINDING-XXX) workflows.
+Find and display the next task ready for implementation, verifying any in-progress work first.
 
 ## Step 0: Validate Argument
 
 **If $ARGUMENTS is empty or missing:**
-> "Error: Directory name is required.
+> "Error: Feature name is required.
 >
-> **Usage:** `/implement-next-task <directory-name>`
+> **Usage:** `/implement-next-task <feature-name>`
 >
-> The directory name should match your planning context:
-> - For features: the feature name used with `/feature-planning`
-> - For production readiness: the context name used with `/production-readiness-review`
+> The feature name should match the name used with `/feature-planning`.
 >
-> **To see available directories:**
+> **To see available features:**
 > ```bash
-> ls .shipspec/planning/           # Feature planning
-> ls .shipspec/production-readiness/  # Production readiness
+> ls .shipspec/planning/
 > ```"
 
 **Stop here** - do not proceed without an argument.
 
-## Step 1: Auto-Detect Workflow Directory
+## Step 1: Locate Feature Directory
 
-Check which directory the argument exists in:
+Check that the feature directory exists:
 
 ```bash
-echo "=== Auto-detecting workflow directory ==="
-ls -d .shipspec/planning/$ARGUMENTS 2>/dev/null && echo "FOUND_PLANNING"
-ls -d .shipspec/production-readiness/$ARGUMENTS 2>/dev/null && echo "FOUND_PRODUCTION"
+ls -d .shipspec/planning/$ARGUMENTS 2>/dev/null || echo "NOT_FOUND"
 ```
 
-**Directory resolution:**
-- If found in `.shipspec/planning/` only → **Feature Planning** workflow (uses TASK-XXX IDs)
-  - Set `WORKFLOW_DIR=.shipspec/planning/$ARGUMENTS`
-- If found in `.shipspec/production-readiness/` only → **Production Readiness** workflow (uses FINDING-XXX IDs)
-  - Set `WORKFLOW_DIR=.shipspec/production-readiness/$ARGUMENTS`
-- If found in BOTH → Error: "Ambiguous: '$ARGUMENTS' exists in both `.shipspec/planning/` and `.shipspec/production-readiness/`. Please use a unique name or specify the full path."
-- If found in NEITHER → Error: "No directory found for '$ARGUMENTS'. Please run either:
-  - `/feature-planning $ARGUMENTS` - for new feature development
-  - `/production-readiness-review $ARGUMENTS` - for production readiness analysis"
+**If NOT_FOUND:**
+> "No directory found for '$ARGUMENTS' at `.shipspec/planning/$ARGUMENTS`.
+>
+> Please run `/feature-planning $ARGUMENTS` first to create the planning artifacts."
 
 **Check for TASKS.md:**
 ```bash
-ls -la $WORKFLOW_DIR/TASKS.md 2>/dev/null || echo "TASKS.md NOT FOUND"
+ls -la .shipspec/planning/$ARGUMENTS/TASKS.md 2>/dev/null || echo "TASKS.md NOT FOUND"
 ```
 
 **If TASKS.md not found:**
-> "No TASKS.md found in '$WORKFLOW_DIR/'.
+> "No TASKS.md found in `.shipspec/planning/$ARGUMENTS/`.
 >
-> - For feature planning: Run `/feature-planning $ARGUMENTS` to complete the planning workflow.
-> - For production readiness: Run `/production-readiness-review $ARGUMENTS` to generate remediation tasks."
+> Run `/feature-planning $ARGUMENTS` to complete the planning workflow and generate tasks."
 
 ## Step 2: Load and Parse Tasks
 
 Load the tasks document:
-@$WORKFLOW_DIR/TASKS.md
+@.shipspec/planning/$ARGUMENTS/TASKS.md
 
 Parse the document to extract:
-1. **Workflow type** (determined by directory location in Step 1)
-2. **Task ID pattern**:
-   - Feature Planning: `TASK-XXX`
-   - Production Readiness: `FINDING-XXX`
-3. **All tasks** with their IDs, titles, and statuses
-4. **Status indicators**:
+1. **All tasks** with their IDs (TASK-XXX), titles, and statuses
+2. **Status indicators**:
    - `- [ ]` = Not started
    - `- [~]` = In progress
    - `- [x]` = Completed
-5. **Dependencies** from each task's `Depends on:` line
+3. **Dependencies** from each task's `Depends on:` line
 
-Build a task map (example for each workflow type):
-
-**Feature Planning:**
+Build a task map:
 ```
 TASK-001: status=[ ], depends_on=[], title="..."
 TASK-002: status=[ ], depends_on=[TASK-001], title="..."
 TASK-003: status=[x], depends_on=[], title="..."
-```
-
-**Production Readiness:**
-```
-FINDING-001: status=[ ], depends_on=[], title="..."
-FINDING-002: status=[ ], depends_on=[FINDING-001], title="..."
-FINDING-003: status=[x], depends_on=[], title="..."
 ```
 
 ## Step 3: Check for In-Progress Task
@@ -160,18 +136,15 @@ Otherwise, show the blocking situation:
 Once a ready task is found:
 
 1. **Update TASKS.md**: Change the task's status from `[ ]` to `[~]`
-   - For Feature Planning: Find `### - [ ] TASK-XXX:` → Replace with `### - [~] TASK-XXX:`
-   - For Production Readiness: Find `### - [ ] FINDING-XXX:` → Replace with `### - [~] FINDING-XXX:`
+   - Find `### - [ ] TASK-XXX:` → Replace with `### - [~] TASK-XXX:`
 
 2. **Extract the full task prompt**: Get all content from the task header until the next task header (or end of phase/document)
 
-3. **Display to user** (workflow-aware):
+3. **Display to user**:
 
-> "## Starting Task: [TASK-ID or FINDING-ID]
+> "## Starting Task: [TASK-ID]
 >
 > **[Task Title]**
->
-> **Workflow:** [Feature Development | Production Remediation]
 >
 > Status updated to: In Progress
 >
@@ -201,26 +174,24 @@ After displaying the task, show progress:
 ## Edge Cases
 
 ### Missing Argument
-If no directory name is provided, show the error from Step 0 and stop.
+If no feature name is provided, show the error from Step 0 and stop.
 
 ### Multiple In-Progress Tasks
 If more than one task is marked `[~]`:
 > "Warning: Multiple tasks are marked as in-progress. This shouldn't happen.
 >
 > In-progress tasks:
-> - [TASK-XXX or FINDING-XXX]: [Title]
-> - [TASK-YYY or FINDING-YYY]: [Title]
+> - [TASK-XXX]: [Title]
+> - [TASK-YYY]: [Title]
 >
 > Please resolve this by marking all but one as either `[ ]` (not started) or `[x]` (completed), then run this command again."
 
 ### Circular Dependencies
 If dependency resolution detects a cycle:
 > "Error: Circular dependency detected in tasks. Please review the dependency chain:
-> [ID-001] → [ID-002] → [ID-003] → [ID-001]
+> TASK-001 → TASK-002 → TASK-003 → TASK-001
 >
 > Fix the dependencies in TASKS.md and try again."
-
-(Use TASK-XXX for feature planning or FINDING-XXX for production readiness based on detected workflow)
 
 ### Empty Dependencies Field
 If a task has `Depends on: None` or no dependencies section, treat it as having no dependencies (ready if status is `[ ]`).

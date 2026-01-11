@@ -1,6 +1,6 @@
 ---
 description: Review implementation changes against planning artifacts (TASKS.md, SDD.md, PRD.md)
-argument-hint: <directory-name>
+argument-hint: <feature-name>
 allowed-tools: Read, Glob, Grep, Write, Edit, Bash(git:*), Bash(npm:*), Bash(npx:*), Bash(ls:*), Bash(cat:*), Bash(find:*), Bash(head:*), Bash(wc:*)
 ---
 
@@ -11,59 +11,41 @@ Validate implementation work against planning artifacts by checking acceptance c
 ## Step 0: Validate Argument
 
 **If $ARGUMENTS is empty or missing:**
-> "Error: Directory name is required.
+> "Error: Feature name is required.
 >
-> **Usage:** `/review-diff <directory-name>`
+> **Usage:** `/review-diff <feature-name>`
 >
-> The directory name should match your planning context used with `/feature-planning` or `/implement-next-task`.
+> The feature name should match the name used with `/feature-planning` or `/implement-next-task`.
 >
-> **To see available directories:**
+> **To see available features:**
 > ```bash
-> ls .shipspec/planning/           # Feature planning
-> ls .shipspec/production-readiness/  # Production readiness
+> ls .shipspec/planning/
 > ```"
 
 **Stop here** - do not proceed without an argument.
 
-## Step 1: Auto-Detect Workflow Directory
+## Step 1: Locate Feature Directory
 
-Check which directory the argument exists in:
+Check that the feature directory exists:
 
 ```bash
-echo "=== Auto-detecting workflow directory ==="
-ls -d .shipspec/planning/$ARGUMENTS 2>/dev/null && echo "FOUND_PLANNING"
-ls -d .shipspec/production-readiness/$ARGUMENTS 2>/dev/null && echo "FOUND_PRODUCTION"
+ls -d .shipspec/planning/$ARGUMENTS 2>/dev/null || echo "NOT_FOUND"
 ```
 
-**Directory resolution:**
-- If found in `.shipspec/planning/` only → **Feature Planning** workflow (uses TASK-XXX IDs)
-  - Set `WORKFLOW_DIR=.shipspec/planning/$ARGUMENTS`
-- If found in `.shipspec/production-readiness/` only → **Production Readiness** workflow (uses FINDING-XXX IDs)
-  - Set `WORKFLOW_DIR=.shipspec/production-readiness/$ARGUMENTS`
-- If found in BOTH → Error: "Ambiguous: '$ARGUMENTS' exists in both `.shipspec/planning/` and `.shipspec/production-readiness/`. Please use a unique name or specify the full path."
-- If found in NEITHER → Error: "No directory found for '$ARGUMENTS'. Please run either:
-  - `/feature-planning $ARGUMENTS` - for new feature development
-  - `/production-readiness-review $ARGUMENTS` - for production readiness analysis"
-
-**Check for TASKS.md (required for both workflows):**
-```bash
-ls $WORKFLOW_DIR/TASKS.md 2>/dev/null || echo "TASKS.md NOT FOUND"
-```
-
-**If TASKS.md not found:**
-> "No TASKS.md found in '$WORKFLOW_DIR/'.
+**If NOT_FOUND:**
+> "No directory found for '$ARGUMENTS' at `.shipspec/planning/$ARGUMENTS`.
 >
-> - For feature planning: Run `/feature-planning $ARGUMENTS` to complete the planning workflow.
-> - For production readiness: Run `/production-readiness-review $ARGUMENTS` to generate remediation tasks."
+> Please run `/feature-planning $ARGUMENTS` first to create the planning artifacts."
 
-**For Feature Planning workflow only**, also verify PRD.md and SDD.md exist:
+**Check for required planning artifacts:**
 ```bash
-echo "=== Checking feature planning artifacts ==="
-ls $WORKFLOW_DIR/PRD.md 2>/dev/null || echo "PRD.md NOT FOUND"
-ls $WORKFLOW_DIR/SDD.md 2>/dev/null || echo "SDD.md NOT FOUND"
+echo "=== Checking planning artifacts ==="
+ls .shipspec/planning/$ARGUMENTS/TASKS.md 2>/dev/null || echo "TASKS.md NOT FOUND"
+ls .shipspec/planning/$ARGUMENTS/PRD.md 2>/dev/null || echo "PRD.md NOT FOUND"
+ls .shipspec/planning/$ARGUMENTS/SDD.md 2>/dev/null || echo "SDD.md NOT FOUND"
 ```
 
-**If Feature Planning and any artifact missing:**
+**If any artifact missing:**
 > "Missing required planning artifacts for '$ARGUMENTS':
 > - [List missing files]
 >
@@ -72,7 +54,7 @@ ls $WORKFLOW_DIR/SDD.md 2>/dev/null || echo "SDD.md NOT FOUND"
 ## Step 2: Find In-Progress Task
 
 Load TASKS.md and find the in-progress task:
-@$WORKFLOW_DIR/TASKS.md
+@.shipspec/planning/$ARGUMENTS/TASKS.md
 
 Search for a task marked with `[~]` (in progress).
 
@@ -95,7 +77,7 @@ Search for a task marked with `[~]` (in progress).
 > Please resolve this by marking all but one as either `[ ]` or `[x]`, then run this command again."
 
 **Once in-progress task is identified, extract:**
-- Task ID (TASK-XXX or FINDING-XXX)
+- Task ID (TASK-XXX)
 - Task title
 - Full task content (from header until next task header or end of section)
 
@@ -111,8 +93,8 @@ Get the list of changed files:
 echo "=== Files changed (uncommitted) ==="
 git status --short
 echo ""
-echo "=== Detailed diff ==="
-git diff --stat
+echo "=== Detailed diff (staged and unstaged) ==="
+git diff HEAD --stat
 ```
 
 Store the list of changed files for reference in validation steps.
@@ -128,13 +110,11 @@ Store the list of changed files for reference in validation steps.
 
 **Stop here** - cannot review without uncommitted changes to analyze.
 
-## Step 4: Load Planning Artifacts (Feature Planning Only)
+## Step 4: Load Planning Artifacts
 
-**For Feature Planning workflow**, load the PRD and SDD for reference:
-@$WORKFLOW_DIR/PRD.md
-@$WORKFLOW_DIR/SDD.md
-
-**For Production Readiness workflow**, skip this step - proceed directly to Step 5.
+Load the PRD and SDD for reference:
+@.shipspec/planning/$ARGUMENTS/PRD.md
+@.shipspec/planning/$ARGUMENTS/SDD.md
 
 ## Step 5: Validate Acceptance Criteria
 
@@ -183,11 +163,9 @@ For each criterion:
 **Result:** X passed, Y failed, Z could not verify
 ```
 
-## Step 6: Validate Design Alignment (Feature Planning Only)
+## Step 6: Validate Design Alignment
 
-**For Production Readiness workflow**, skip this step entirely - mark as N/A and proceed to Step 7.
-
-**For Feature Planning workflow**, from the in-progress task, locate the `## References` section and find the `Design Doc: Section X.Y` reference.
+From the in-progress task, locate the `## References` section and find the `Design Doc: Section X.Y` reference.
 
 **If no design reference found:**
 > "Note: No Design Doc reference found in task. Skipping design alignment check."
@@ -236,11 +214,9 @@ For each relevant aspect, compare the git diff changes against the SDD section.
 **Result:** X/Y aspects verified
 ```
 
-## Step 7: Validate Requirements Coverage (Feature Planning Only)
+## Step 7: Validate Requirements Coverage
 
-**For Production Readiness workflow**, skip this step entirely - mark as N/A and proceed to Step 8.
-
-**For Feature Planning workflow**, from the in-progress task, locate the `## References` section and find PRD references (e.g., `PRD: REQ-001, REQ-005`).
+From the in-progress task, locate the `## References` section and find PRD references (e.g., `PRD: REQ-001, REQ-005`).
 
 **If no PRD references found:**
 > "Note: No PRD requirement references found in task. Skipping requirements coverage check."
@@ -311,16 +287,18 @@ Compile results from all three validation categories:
 **APPROVED** (all validations pass):
 - No acceptance criteria FAILED (CANNOT_VERIFY is acceptable)
 - At least one criterion exists
-- Design alignment verified (or N/A if no reference or Production Readiness workflow)
-- All requirements satisfied (or N/A if no reference or Production Readiness workflow)
+- Design alignment verified, N/A, or CANNOT_VERIFY (not BLOCKED or FAIL)
+- All found requirements satisfied, N/A, or CANNOT_VERIFY (not BLOCKED or FAIL)
 
 **NEEDS WORK** (any validation fails):
 - One or more acceptance criteria FAILED
-- OR design misalignment detected
-- OR requirements not satisfied
+- OR design alignment FAILED (implementation doesn't match design)
+- OR requirements FAILED (implementation doesn't satisfy requirements)
 
 **BLOCKED** (cannot determine verdict):
 - No acceptance criteria found in task
+- OR design validation BLOCKED (referenced section missing from SDD.md)
+- OR requirements validation BLOCKED (all referenced requirements missing from PRD.md)
 - OR critical infrastructure missing (e.g., cannot run any verifications)
 
 ## Step 9: Take Action Based on Verdict
@@ -328,8 +306,7 @@ Compile results from all three validation categories:
 ### If APPROVED:
 
 1. Update TASKS.md to mark the task as complete:
-   - For Feature Planning: Change `### - [~] TASK-XXX:` to `### - [x] TASK-XXX:`
-   - For Production Readiness: Change `### - [~] FINDING-XXX:` to `### - [x] FINDING-XXX:`
+   - Change `### - [~] TASK-XXX:` to `### - [x] TASK-XXX:`
 
 2. Display success message:
 > "## APPROVED
@@ -338,8 +315,8 @@ Compile results from all three validation categories:
 >
 > **Summary:**
 > - Acceptance Criteria: X passed [Y could not verify - review manually]
-> - Design Alignment: [Verified | N/A for Production Readiness]
-> - Requirements: [X/X satisfied | N/A for Production Readiness]
+> - Design Alignment: Verified
+> - Requirements: X/X satisfied
 >
 > **Next Steps:**
 > - Commit your changes: `git add . && git commit -m "Complete [TASK-ID]: [Title]"`
