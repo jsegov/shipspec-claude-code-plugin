@@ -1,12 +1,12 @@
 ---
-description: Analyze codebase for production readiness and generate fix prompts
+description: Analyze codebase for production readiness and generate remediation tasks
 argument-hint: <context-name>
 allowed-tools: Read, Glob, Grep, Write, Bash(git status), Bash(ls:*), Bash(mkdir:*), Bash(find:*), Bash(head:*), Bash(cat:*), Bash(wc:*), WebSearch, WebFetch
 ---
 
-# Production Readiness Analysis: $ARGUMENTS
+# Production Readiness Review: $ARGUMENTS
 
-Analyze the codebase for production readiness, identifying security vulnerabilities, compliance gaps, and code quality issues.
+Analyze the codebase for production readiness, identifying security vulnerabilities, compliance gaps, and code quality issues. Generate structured remediation tasks that can be implemented using `/implement-next-task`.
 
 ## Step 1: Setup Output Directory
 
@@ -63,12 +63,12 @@ The analyzer will:
 - Filter false positives
 - Document findings with evidence and severity
 
-## Step 5: Generate Reports
+## Step 5: Generate Reports and Tasks
 
 Delegate to the `production-reporter` subagent to generate:
 
 1. **production-report.md** - Executive summary, findings by category, compliance matrix, remediation roadmap
-2. **fix-prompts.md** - Agent-ready prompts for each finding
+2. **TASKS.md** - Structured remediation tasks (same format as feature-planning tasks)
 
 Save to: `.shipspec/planning/$ARGUMENTS/`
 
@@ -76,12 +76,12 @@ Save to: `.shipspec/planning/$ARGUMENTS/`
 
 After report generation, present a summary:
 
-> **Production Readiness Analysis Complete**
+> **Production Readiness Review Complete**
 >
 > **Output files:**
 > - `.shipspec/planning/$ARGUMENTS/production-signals.md` - Detected tech stack and infrastructure
 > - `.shipspec/planning/$ARGUMENTS/production-report.md` - Full analysis report
-> - `.shipspec/planning/$ARGUMENTS/fix-prompts.md` - Agent-ready fix prompts
+> - `.shipspec/planning/$ARGUMENTS/TASKS.md` - Structured remediation tasks
 >
 > **Summary:**
 > - Overall Status: [Ready/Ready with Reservations/Not Ready]
@@ -92,9 +92,8 @@ After report generation, present a summary:
 >
 > **Recommended Next Steps:**
 > 1. Review production-report.md with stakeholders
-> 2. Address critical findings immediately
-> 3. Use fix-prompts.md to fix issues with Claude Code
-> 4. Re-run `/productionalize $ARGUMENTS` after fixes to verify
+> 2. Run `/implement-next-task $ARGUMENTS` to start fixing issues
+> 3. Re-run `/production-readiness-review $ARGUMENTS` after fixes to verify
 
 ## Pre-loaded Context
 

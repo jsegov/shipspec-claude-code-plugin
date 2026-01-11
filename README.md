@@ -1,4 +1,4 @@
-# ShipSpec Planning Plugin
+# ShipSpec Claude Code Plugin
 
 **Spec-driven development for Claude Code.** Plan features systematically before writing code—transform ideas into well-structured PRDs, technical designs, and implementation tasks. Analyze codebases for security vulnerabilities, compliance gaps, and production blockers.
 
@@ -16,16 +16,6 @@ Spec-driven development ensures you think through requirements and architecture 
 ## Installation
 
 ### From Local Directory
-
-```bash
-# Add as a local marketplace
-/plugin marketplace add /path/to/shipspec
-
-# Install the plugin
-/plugin install shipspec@local
-```
-
-### From GitHub (when published)
 
 ```bash
 /plugin marketplace add shipspec/planning-plugin
