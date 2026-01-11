@@ -33,6 +33,9 @@ Spec-driven development ensures you think through requirements and architecture 
 # Implement tasks one by one
 /implement-next-task my-feature
 
+# Review implementation against planning artifacts
+/review-diff my-feature
+
 # Analyze codebase for production readiness
 /productionalize my-analysis
 ```
@@ -139,6 +142,7 @@ Note: A temporary `context.md` file is created during planning but automatically
 |---------|-------------|
 | `/feature-planning <name>` | Run complete planning workflow (requirements → PRD → SDD → tasks) |
 | `/implement-next-task <name>` | Start/continue implementing tasks from TASKS.md |
+| `/review-diff <name>` | Review implementation against planning artifacts (TASKS.md, SDD.md, PRD.md) |
 | `/productionalize <name>` | Analyze codebase for production readiness |
 
 ## Agents
@@ -216,11 +220,35 @@ Production analysis covers six categories:
 | Testing | Coverage, test types, CI | Quality assurance |
 | Configuration | Secrets, env separation | Secure configuration |
 
+## Implementation Workflow
+
+After planning is complete, use this workflow to implement tasks:
+
+```
+/implement-next-task my-feature    # Start a task (marks it [~])
+        ↓
+   Implement the task              # Write the code
+        ↓
+/review-diff my-feature            # Validate against PRD, SDD, acceptance criteria
+        ↓
+   ┌────┴────┐
+   │ Passed? │
+   └────┬────┘
+   Yes: Task marked [x], suggests next task
+   No:  Shows issues to fix, re-run /review-diff after fixing
+```
+
+The `/review-diff` command validates three things:
+1. **Acceptance Criteria** - All criteria from the task in TASKS.md are met
+2. **Design Alignment** - Implementation follows the referenced SDD section
+3. **Requirements Coverage** - Referenced PRD requirements are satisfied
+
 ## Tips
 
 - **Use `/feature-planning` for full workflow**: Single command runs requirements → PRD → SDD → tasks
 - **Review at each gate**: The workflow pauses after PRD and SDD for your review
 - **Use `/implement-next-task` to work through tasks**: Tracks progress and verifies completion
+- **Use `/review-diff` after implementing**: Validates work against planning artifacts before marking complete
 - **Run `/productionalize` before launch**: Catch security issues early
 - **Use fix prompts**: Copy prompts from fix-prompts.md to remediate issues quickly
 
