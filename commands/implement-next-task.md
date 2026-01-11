@@ -19,45 +19,41 @@ Find and display the next task ready for implementation, verifying any in-progre
 > - For features: the feature name used with `/feature-planning`
 > - For production readiness: the context name used with `/production-readiness-review`
 >
-> **To see available planning directories:**
+> **To see available directories:**
 > ```bash
-> ls .shipspec/planning/
+> ls .shipspec/planning/           # Feature planning
+> ls .shipspec/production-readiness/  # Production readiness
 > ```"
 
 **Stop here** - do not proceed without an argument.
 
-## Step 1: Validate Prerequisites and Detect Workflow
+## Step 1: Auto-Detect Workflow Directory
 
-Check that the planning directory exists:
+Check which directory the argument exists in:
+
 ```bash
-echo "=== Checking planning directory ==="
-ls -la .shipspec/planning/$ARGUMENTS/ 2>/dev/null || echo "DIRECTORY NOT FOUND"
+echo "=== Auto-detecting workflow directory ==="
+ls -d .shipspec/planning/$ARGUMENTS 2>/dev/null && echo "FOUND_PLANNING"
+ls -d .shipspec/production-readiness/$ARGUMENTS 2>/dev/null && echo "FOUND_PRODUCTION"
 ```
 
-**If directory not found:**
-> "No planning directory found for '$ARGUMENTS'. Please run either:
-> - `/feature-planning $ARGUMENTS` - for new feature development
-> - `/production-readiness-review $ARGUMENTS` - for production readiness analysis"
-
-**Detect workflow type:**
-```bash
-echo "=== Detecting workflow type ==="
-ls .shipspec/planning/$ARGUMENTS/PRD.md .shipspec/planning/$ARGUMENTS/SDD.md 2>/dev/null && echo "FEATURE_PLANNING"
-ls .shipspec/planning/$ARGUMENTS/production-report.md 2>/dev/null && echo "PRODUCTION_READINESS"
-```
-
-- If `PRD.md` and `SDD.md` exist → **Feature Planning** workflow (uses TASK-XXX IDs)
-- If `production-report.md` exists → **Production Readiness** workflow (uses FINDING-XXX IDs)
-- If BOTH exist → **Production Readiness** workflow takes precedence (it's likely a recent analysis overlaid on an existing feature)
-- If neither → Error: "Directory exists but contains no recognized planning artifacts. Expected either PRD.md/SDD.md (feature planning) or production-report.md (production readiness)."
+**Directory resolution:**
+- If found in `.shipspec/planning/` only → **Feature Planning** workflow (uses TASK-XXX IDs)
+  - Set `WORKFLOW_DIR=.shipspec/planning/$ARGUMENTS`
+- If found in `.shipspec/production-readiness/` only → **Production Readiness** workflow (uses FINDING-XXX IDs)
+  - Set `WORKFLOW_DIR=.shipspec/production-readiness/$ARGUMENTS`
+- If found in BOTH → Error: "Ambiguous: '$ARGUMENTS' exists in both `.shipspec/planning/` and `.shipspec/production-readiness/`. Please use a unique name or specify the full path."
+- If found in NEITHER → Error: "No directory found for '$ARGUMENTS'. Please run either:
+  - `/feature-planning $ARGUMENTS` - for new feature development
+  - `/production-readiness-review $ARGUMENTS` - for production readiness analysis"
 
 **Check for TASKS.md:**
 ```bash
-ls -la .shipspec/planning/$ARGUMENTS/TASKS.md 2>/dev/null || echo "TASKS.md NOT FOUND"
+ls -la $WORKFLOW_DIR/TASKS.md 2>/dev/null || echo "TASKS.md NOT FOUND"
 ```
 
 **If TASKS.md not found:**
-> "No TASKS.md found in '.shipspec/planning/$ARGUMENTS/'.
+> "No TASKS.md found in '$WORKFLOW_DIR/'.
 >
 > - For feature planning: Run `/feature-planning $ARGUMENTS` to complete the planning workflow.
 > - For production readiness: Run `/production-readiness-review $ARGUMENTS` to generate remediation tasks."
@@ -65,10 +61,10 @@ ls -la .shipspec/planning/$ARGUMENTS/TASKS.md 2>/dev/null || echo "TASKS.md NOT 
 ## Step 2: Load and Parse Tasks
 
 Load the tasks document:
-@.shipspec/planning/$ARGUMENTS/TASKS.md
+@$WORKFLOW_DIR/TASKS.md
 
 Parse the document to extract:
-1. **Workflow type** (from Step 1 detection)
+1. **Workflow type** (determined by directory location in Step 1)
 2. **Task ID pattern**:
    - Feature Planning: `TASK-XXX`
    - Production Readiness: `FINDING-XXX`

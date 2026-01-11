@@ -17,54 +17,50 @@ Validate implementation work against planning artifacts by checking acceptance c
 >
 > The directory name should match your planning context used with `/feature-planning` or `/implement-next-task`.
 >
-> **To see available planning directories:**
+> **To see available directories:**
 > ```bash
-> ls .shipspec/planning/
+> ls .shipspec/planning/           # Feature planning
+> ls .shipspec/production-readiness/  # Production readiness
 > ```"
 
 **Stop here** - do not proceed without an argument.
 
-## Step 1: Validate Prerequisites and Detect Workflow
+## Step 1: Auto-Detect Workflow Directory
 
-Check that the planning directory exists:
+Check which directory the argument exists in:
 
 ```bash
-echo "=== Checking planning directory ==="
-ls -la .shipspec/planning/$ARGUMENTS/ 2>/dev/null || echo "DIRECTORY NOT FOUND"
+echo "=== Auto-detecting workflow directory ==="
+ls -d .shipspec/planning/$ARGUMENTS 2>/dev/null && echo "FOUND_PLANNING"
+ls -d .shipspec/production-readiness/$ARGUMENTS 2>/dev/null && echo "FOUND_PRODUCTION"
 ```
 
-**If directory not found:**
-> "No planning directory found for '$ARGUMENTS'. Please run either:
-> - `/feature-planning $ARGUMENTS` - for new feature development
-> - `/productionalize $ARGUMENTS` - for production readiness analysis"
-
-**Detect workflow type:**
-```bash
-echo "=== Detecting workflow type ==="
-ls .shipspec/planning/$ARGUMENTS/PRD.md .shipspec/planning/$ARGUMENTS/SDD.md 2>/dev/null && echo "FEATURE_PLANNING"
-ls .shipspec/planning/$ARGUMENTS/production-report.md 2>/dev/null && echo "PRODUCTION_READINESS"
-```
-
-- If `PRD.md` and `SDD.md` exist → **Feature Planning** workflow (uses TASK-XXX IDs)
-- If `production-report.md` exists → **Production Readiness** workflow (uses FINDING-XXX IDs)
-- If neither → Error: "Directory exists but contains no recognized planning artifacts. Expected either PRD.md/SDD.md (feature planning) or production-report.md (production readiness)."
+**Directory resolution:**
+- If found in `.shipspec/planning/` only → **Feature Planning** workflow (uses TASK-XXX IDs)
+  - Set `WORKFLOW_DIR=.shipspec/planning/$ARGUMENTS`
+- If found in `.shipspec/production-readiness/` only → **Production Readiness** workflow (uses FINDING-XXX IDs)
+  - Set `WORKFLOW_DIR=.shipspec/production-readiness/$ARGUMENTS`
+- If found in BOTH → Error: "Ambiguous: '$ARGUMENTS' exists in both `.shipspec/planning/` and `.shipspec/production-readiness/`. Please use a unique name or specify the full path."
+- If found in NEITHER → Error: "No directory found for '$ARGUMENTS'. Please run either:
+  - `/feature-planning $ARGUMENTS` - for new feature development
+  - `/production-readiness-review $ARGUMENTS` - for production readiness analysis"
 
 **Check for TASKS.md (required for both workflows):**
 ```bash
-ls .shipspec/planning/$ARGUMENTS/TASKS.md 2>/dev/null || echo "TASKS.md NOT FOUND"
+ls $WORKFLOW_DIR/TASKS.md 2>/dev/null || echo "TASKS.md NOT FOUND"
 ```
 
 **If TASKS.md not found:**
-> "No TASKS.md found in '.shipspec/planning/$ARGUMENTS/'.
+> "No TASKS.md found in '$WORKFLOW_DIR/'.
 >
 > - For feature planning: Run `/feature-planning $ARGUMENTS` to complete the planning workflow.
-> - For production readiness: Run `/productionalize $ARGUMENTS` to generate remediation tasks."
+> - For production readiness: Run `/production-readiness-review $ARGUMENTS` to generate remediation tasks."
 
 **For Feature Planning workflow only**, also verify PRD.md and SDD.md exist:
 ```bash
 echo "=== Checking feature planning artifacts ==="
-ls .shipspec/planning/$ARGUMENTS/PRD.md 2>/dev/null || echo "PRD.md NOT FOUND"
-ls .shipspec/planning/$ARGUMENTS/SDD.md 2>/dev/null || echo "SDD.md NOT FOUND"
+ls $WORKFLOW_DIR/PRD.md 2>/dev/null || echo "PRD.md NOT FOUND"
+ls $WORKFLOW_DIR/SDD.md 2>/dev/null || echo "SDD.md NOT FOUND"
 ```
 
 **If Feature Planning and any artifact missing:**
@@ -76,7 +72,7 @@ ls .shipspec/planning/$ARGUMENTS/SDD.md 2>/dev/null || echo "SDD.md NOT FOUND"
 ## Step 2: Find In-Progress Task
 
 Load TASKS.md and find the in-progress task:
-@.shipspec/planning/$ARGUMENTS/TASKS.md
+@$WORKFLOW_DIR/TASKS.md
 
 Search for a task marked with `[~]` (in progress).
 
@@ -133,8 +129,8 @@ Store the list of changed files for reference in validation steps.
 ## Step 4: Load Planning Artifacts (Feature Planning Only)
 
 **For Feature Planning workflow**, load the PRD and SDD for reference:
-@.shipspec/planning/$ARGUMENTS/PRD.md
-@.shipspec/planning/$ARGUMENTS/SDD.md
+@$WORKFLOW_DIR/PRD.md
+@$WORKFLOW_DIR/SDD.md
 
 **For Production Readiness workflow**, skip this step - proceed directly to Step 5.
 

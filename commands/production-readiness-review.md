@@ -13,7 +13,7 @@ Analyze the codebase for production readiness, identifying security vulnerabilit
 Create the output directory for analysis results:
 
 ```bash
-mkdir -p .shipspec/planning/$ARGUMENTS
+mkdir -p .shipspec/production-readiness/$ARGUMENTS
 ```
 
 ## Step 2: Gather Codebase Signals
@@ -28,7 +28,7 @@ Use the production-signals skill to detect:
 - Security configuration
 - Monitoring and observability
 
-Save signals to: `.shipspec/planning/$ARGUMENTS/production-signals.md`
+Save signals to: `.shipspec/production-readiness/$ARGUMENTS/production-signals.md`
 
 ## Step 3: Gather Production Context
 
@@ -70,7 +70,15 @@ Delegate to the `production-reporter` subagent to generate:
 1. **production-report.md** - Executive summary, findings by category, compliance matrix, remediation roadmap
 2. **TASKS.md** - Structured remediation tasks (same format as feature-planning tasks)
 
-Save to: `.shipspec/planning/$ARGUMENTS/`
+Save to: `.shipspec/production-readiness/$ARGUMENTS/`
+
+## Step 5.5: Cleanup Intermediate Files
+
+Remove the intermediate signals file (similar to context.md cleanup in feature-planning):
+
+```bash
+rm -f .shipspec/production-readiness/$ARGUMENTS/production-signals.md
+```
 
 ## Step 6: Present Results
 
@@ -79,9 +87,8 @@ After report generation, present a summary:
 > **Production Readiness Review Complete**
 >
 > **Output files:**
-> - `.shipspec/planning/$ARGUMENTS/production-signals.md` - Detected tech stack and infrastructure
-> - `.shipspec/planning/$ARGUMENTS/production-report.md` - Full analysis report
-> - `.shipspec/planning/$ARGUMENTS/TASKS.md` - Structured remediation tasks
+> - `.shipspec/production-readiness/$ARGUMENTS/production-report.md` - Full analysis report
+> - `.shipspec/production-readiness/$ARGUMENTS/TASKS.md` - Structured remediation tasks
 >
 > **Summary:**
 > - Overall Status: [Ready/Ready with Reservations/Not Ready]

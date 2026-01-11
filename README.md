@@ -37,7 +37,7 @@ Spec-driven development ensures you think through requirements and architecture 
 /review-diff my-feature
 
 # Analyze codebase for production readiness
-/productionalize my-analysis
+/production-readiness-review my-analysis
 ```
 
 ### Full Feature Planning Workflow
@@ -83,10 +83,10 @@ The command guides you through 6 phases:
 
 1. **Start Analysis**
    ```
-   /productionalize pre-launch
+   /production-readiness-review pre-launch
    ```
    This will:
-   - Create `.shipspec/planning/pre-launch/` directory
+   - Create `.shipspec/production-readiness/pre-launch/` directory
    - Detect tech stack and infrastructure
    - Start a guided interview about concerns
 
@@ -108,18 +108,17 @@ The command guides you through 6 phases:
 
 4. **Review Reports**
    ```
-   .shipspec/planning/pre-launch/
-   ├── production-signals.md   # Detected tech stack
+   .shipspec/production-readiness/pre-launch/
    ├── production-report.md    # Full analysis report
-   └── fix-prompts.md          # Agent-ready fix prompts
+   └── TASKS.md                # Remediation tasks
    ```
 
 5. **Fix Issues**
-   Copy prompts from `fix-prompts.md` and paste into Claude Code to remediate findings.
+   Run `/implement-next-task pre-launch` to work through remediation tasks.
 
 6. **Re-verify**
    ```
-   /productionalize pre-launch-v2
+   /production-readiness-review pre-launch-v2
    ```
    Run again after fixes to verify remediation.
 
@@ -136,6 +135,16 @@ After completing the feature planning workflow:
 
 Note: A temporary `context.md` file is created during planning but automatically cleaned up after task generation.
 
+After completing production readiness review:
+
+```
+.shipspec/production-readiness/your-review/
+├── production-report.md   # Full analysis report
+└── TASKS.md               # Remediation tasks
+```
+
+Note: A temporary `production-signals.md` file is created during analysis but automatically cleaned up after report generation.
+
 ## Commands
 
 | Command | Description |
@@ -143,7 +152,7 @@ Note: A temporary `context.md` file is created during planning but automatically
 | `/feature-planning <name>` | Run complete planning workflow (requirements → PRD → SDD → tasks) |
 | `/implement-next-task <name>` | Start/continue implementing tasks from TASKS.md |
 | `/review-diff <name>` | Review implementation against planning artifacts (TASKS.md, SDD.md, PRD.md) |
-| `/productionalize <name>` | Analyze codebase for production readiness |
+| `/production-readiness-review <name>` | Analyze codebase for production readiness |
 
 ## Agents
 
@@ -249,8 +258,8 @@ The `/review-diff` command validates three things:
 - **Review at each gate**: The workflow pauses after PRD and SDD for your review
 - **Use `/implement-next-task` to work through tasks**: Tracks progress and verifies completion
 - **Use `/review-diff` after implementing**: Validates work against planning artifacts before marking complete
-- **Run `/productionalize` before launch**: Catch security issues early
-- **Use fix prompts**: Copy prompts from fix-prompts.md to remediate issues quickly
+- **Run `/production-readiness-review` before launch**: Catch security issues early
+- **Use remediation tasks**: Run `/implement-next-task` to work through production readiness fixes
 
 ## Contributing
 
