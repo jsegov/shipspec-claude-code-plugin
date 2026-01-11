@@ -129,9 +129,11 @@ Structure codebase context summaries as:
 ## Integration Notes
 
 This context should be:
-1. Saved to `docs/planning/<feature>/context.md` for reference
+1. Saved to `.shipspec/planning/<feature>/context.md` temporarily during planning
 2. Used by PRD and design document generation
 3. Referenced when creating implementation tasks
+
+**Note:** The context file is automatically cleaned up after task generation completes. The relevant context is incorporated into the PRD, SDD, and TASKS.md files.
 
 ## Common Tech Stack Indicators
 

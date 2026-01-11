@@ -57,7 +57,7 @@ Read the key files you find. Understand:
 
 ### Phase 2: Review the PRD
 
-The PRD should be at `docs/planning/[feature]/PRD.md`. Read it and:
+The PRD should be at `.shipspec/planning/[feature]/PRD.md`. Read it and:
 - List all requirements (REQ-XXX)
 - Identify technical implications of each
 - Note any requirements that conflict with existing patterns
@@ -165,6 +165,6 @@ Structure your design document following the 8-section Atlassian template. Ensur
 ## Handoff
 
 When complete, the design should be saved to:
-`docs/planning/[feature]/SDD.md`
+`.shipspec/planning/[feature]/SDD.md`
 
 The workflow will automatically proceed to generate implementation tasks.

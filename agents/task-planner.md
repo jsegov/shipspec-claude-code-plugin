@@ -37,9 +37,9 @@ You are a technical project manager specializing in breaking down features into 
 ### Phase 1: Review Inputs
 
 Read the existing planning documents:
-- `docs/planning/[feature]/PRD.md` - Requirements
-- `docs/planning/[feature]/SDD.md` - Technical design
-- `docs/planning/[feature]/context.md` - Codebase context (if exists)
+- `.shipspec/planning/[feature]/PRD.md` - Requirements
+- `.shipspec/planning/[feature]/SDD.md` - Technical design
+- `.shipspec/planning/[feature]/context.md` - Codebase context (if exists)
 
 Extract:
 - All requirements (REQ-XXX)

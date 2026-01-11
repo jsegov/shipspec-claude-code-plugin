@@ -57,7 +57,7 @@ Run `/feature-planning <name>` to go through the complete planning workflow:
 
 The command guides you through 6 phases:
 
-1. **Setup** - Creates `docs/planning/user-authentication/` and extracts codebase context
+1. **Setup** - Creates `.shipspec/planning/user-authentication/` and extracts codebase context
 
 2. **Requirements Gathering** - Interactive Q&A with the PRD Gatherer agent about:
    - The problem you're solving
@@ -93,7 +93,7 @@ The command guides you through 6 phases:
    /productionalize pre-launch
    ```
    This will:
-   - Create `docs/planning/pre-launch/` directory
+   - Create `.shipspec/planning/pre-launch/` directory
    - Detect tech stack and infrastructure
    - Start a guided interview about concerns
 
@@ -115,7 +115,7 @@ The command guides you through 6 phases:
 
 4. **Review Reports**
    ```
-   docs/planning/pre-launch/
+   .shipspec/planning/pre-launch/
    ├── production-signals.md   # Detected tech stack
    ├── production-report.md    # Full analysis report
    └── fix-prompts.md          # Agent-ready fix prompts
@@ -135,12 +135,13 @@ The command guides you through 6 phases:
 After completing the feature planning workflow:
 
 ```
-docs/planning/your-feature/
-├── context.md   # Codebase context and patterns
+.shipspec/planning/your-feature/
 ├── PRD.md       # Product Requirements Document
 ├── SDD.md       # Software Design Document
 └── TASKS.md     # Implementation tasks with agent prompts
 ```
+
+Note: A temporary `context.md` file is created during planning but automatically cleaned up after task generation.
 
 ## Commands
 
