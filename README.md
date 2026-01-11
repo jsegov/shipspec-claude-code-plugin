@@ -1,6 +1,6 @@
 # ShipSpec Claude Code Plugin
 
-**Spec-driven development for Claude Code.** Plan features systematically before writing code—transform ideas into well-structured PRDs, technical designs, and implementation tasks. Analyze codebases for security vulnerabilities, compliance gaps, and production blockers.
+**Spec-driven development for Claude Code.** Plan features systematically before writing code—transform ideas into well-structured PRDs, technical designs, and implementation tasks.
 
 Spec-driven development ensures you think through requirements and architecture before implementation, resulting in better code, fewer rewrites, and clearer communication.
 
@@ -10,8 +10,6 @@ Spec-driven development ensures you think through requirements and architecture 
 - **Codebase-Aware Design**: Technical designs grounded in your existing architecture
 - **Agent-Ready Tasks**: Implementation tasks with detailed prompts for coding agents
 - **Progressive Workflow**: Each phase builds on the previous
-- **Production Readiness Analysis**: Comprehensive code analysis for security, SOC 2, and deployment
-- **Fix Prompts Generation**: Agent-ready prompts to remediate identified issues
 
 ## Installation
 
@@ -33,8 +31,8 @@ Spec-driven development ensures you think through requirements and architecture 
 # Implement tasks one by one
 /implement-next-task my-feature
 
-# Analyze codebase for production readiness
-/productionalize my-analysis
+# Review implementation against planning artifacts
+/review-diff my-feature
 ```
 
 ### Full Feature Planning Workflow
@@ -76,50 +74,6 @@ The command guides you through 6 phases:
    - Detailed agent prompts
    - Acceptance criteria
 
-### Production Readiness Workflow
-
-1. **Start Analysis**
-   ```
-   /productionalize pre-launch
-   ```
-   This will:
-   - Create `.shipspec/planning/pre-launch/` directory
-   - Detect tech stack and infrastructure
-   - Start a guided interview about concerns
-
-2. **Gather Context**
-   The Production Interviewer agent will ask about:
-   - Primary concerns (security, performance, compliance)
-   - Deployment target (AWS, GCP, Azure, etc.)
-   - Compliance requirements (SOC 2, HIPAA, PCI-DSS, GDPR)
-   - Timeline and constraints
-
-3. **Deep Analysis**
-   The Production Analyzer examines six categories:
-   - **Security**: Hardcoded secrets, injection vulnerabilities, auth issues
-   - **SOC 2**: Logging, access control, encryption, change management
-   - **Code Quality**: Error handling, technical debt, type safety
-   - **Dependencies**: Lock files, risky patterns
-   - **Testing**: Coverage, test types, CI integration
-   - **Configuration**: Secret management, environment separation
-
-4. **Review Reports**
-   ```
-   .shipspec/planning/pre-launch/
-   ├── production-signals.md   # Detected tech stack
-   ├── production-report.md    # Full analysis report
-   └── fix-prompts.md          # Agent-ready fix prompts
-   ```
-
-5. **Fix Issues**
-   Copy prompts from `fix-prompts.md` and paste into Claude Code to remediate findings.
-
-6. **Re-verify**
-   ```
-   /productionalize pre-launch-v2
-   ```
-   Run again after fixes to verify remediation.
-
 ## Output Structure
 
 After completing the feature planning workflow:
@@ -139,7 +93,7 @@ Note: A temporary `context.md` file is created during planning but automatically
 |---------|-------------|
 | `/feature-planning <name>` | Run complete planning workflow (requirements → PRD → SDD → tasks) |
 | `/implement-next-task <name>` | Start/continue implementing tasks from TASKS.md |
-| `/productionalize <name>` | Analyze codebase for production readiness |
+| `/review-diff <name>` | Review implementation against planning artifacts (TASKS.md, SDD.md, PRD.md) |
 
 ## Agents
 
@@ -149,9 +103,6 @@ Note: A temporary `context.md` file is created during planning but automatically
 | `design-architect` | Technical design | Architecture decisions, API design |
 | `task-planner` | Task decomposition | Breaking down features |
 | `task-verifier` | Verify task completion | Running /implement-next-task |
-| `production-interviewer` | Production context gathering | Checking production readiness |
-| `production-analyzer` | Deep code analysis | Security/compliance analysis |
-| `production-reporter` | Report generation | Creating production reports |
 
 ## Skills
 
@@ -161,8 +112,6 @@ Note: A temporary `context.md` file is created during planning but automatically
 | `prd-template` | PRD structure and best practices |
 | `sdd-template` | Atlassian 8-section design template |
 | `agent-prompts` | Task prompt generation patterns |
-| `production-signals` | Detect tech stack and infrastructure for production |
-| `production-analysis` | Code analysis patterns for security and compliance |
 
 ## Requirement Numbering
 
@@ -191,38 +140,35 @@ Tasks use Fibonacci story points:
 
 Tasks larger than 8 points are automatically broken down.
 
-## Production Analysis Severity
+## Implementation Workflow
 
-Findings from production analysis use these severity levels:
+After planning is complete, use this workflow to implement tasks:
 
-| Severity | Definition | Action |
-|----------|------------|--------|
-| Critical | Immediate security risk, data exposure likely | Block deployment |
-| High | Significant risk, should block production | Fix before production |
-| Medium | Best practice violation, moderate risk | Fix within sprint |
-| Low | Code smell, minor improvement | Fix when convenient |
-| Info | Observation or recommendation | Document only |
+```
+/implement-next-task my-feature    # Start a task (marks it [~])
+        ↓
+   Implement the task              # Write the code
+        ↓
+/review-diff my-feature            # Validate against PRD, SDD, acceptance criteria
+        ↓
+   ┌────┴────┐
+   │ Passed? │
+   └────┬────┘
+   Yes: Task marked [x], suggests next task
+   No:  Shows issues to fix, re-run /review-diff after fixing
+```
 
-## Analysis Categories
-
-Production analysis covers six categories:
-
-| Category | What It Checks | Compliance References |
-|----------|----------------|----------------------|
-| Security | Secrets, injection, XSS, auth | OWASP Top 10 |
-| SOC 2 | Logging, access control, encryption | CC6.1, CC6.7, CC7.2, CC8.1 |
-| Code Quality | Error handling, debt, type safety | Best practices |
-| Dependencies | Lock files, risky patterns | Supply chain security |
-| Testing | Coverage, test types, CI | Quality assurance |
-| Configuration | Secrets, env separation | Secure configuration |
+The `/review-diff` command validates three things:
+1. **Acceptance Criteria** - All criteria from the task in TASKS.md are met
+2. **Design Alignment** - Implementation follows the referenced SDD section
+3. **Requirements Coverage** - Referenced PRD requirements are satisfied
 
 ## Tips
 
 - **Use `/feature-planning` for full workflow**: Single command runs requirements → PRD → SDD → tasks
 - **Review at each gate**: The workflow pauses after PRD and SDD for your review
 - **Use `/implement-next-task` to work through tasks**: Tracks progress and verifies completion
-- **Run `/productionalize` before launch**: Catch security issues early
-- **Use fix prompts**: Copy prompts from fix-prompts.md to remediate issues quickly
+- **Use `/review-diff` after implementing**: Validates work against planning artifacts before marking complete
 
 ## Contributing
 
