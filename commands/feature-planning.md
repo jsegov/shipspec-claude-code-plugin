@@ -1,7 +1,7 @@
 ---
 description: Start planning a new feature with AI-assisted PRD generation
 argument-hint: <feature-name>
-allowed-tools: Read, Glob, Grep, Write, Bash(git status), Bash(git log:*), Bash(find:*), Bash(ls:*), Bash(cat:*), Bash(head:*), Bash(mkdir:*), Task
+allowed-tools: Read, Glob, Grep, Write, Bash(git status), Bash(git log:*), Bash(find:*), Bash(ls:*), Bash(cat:*), Bash(head:*), Bash(mkdir:*), Bash(rm:*), Task, AskUserQuestion
 ---
 
 # Feature Planning: $ARGUMENTS
@@ -25,7 +25,7 @@ This command runs through 6 phases:
 Create the planning directory structure:
 
 ```bash
-mkdir -p docs/planning/$ARGUMENTS
+mkdir -p .shipspec/planning/$ARGUMENTS
 ```
 
 ### Extract Codebase Context
@@ -38,7 +38,7 @@ Analyze the current codebase to understand:
 4. **Documentation** - What guidance exists?
 
 Use the codebase-context skill for this analysis. Save findings to:
-`docs/planning/$ARGUMENTS/context.md`
+`.shipspec/planning/$ARGUMENTS/context.md`
 
 ---
 
@@ -65,7 +65,7 @@ When the user indicates requirements are complete, proceed to Phase 3.
 
 Load the context file:
 ```bash
-cat docs/planning/$ARGUMENTS/context.md 2>/dev/null || echo "No context file found"
+cat .shipspec/planning/$ARGUMENTS/context.md 2>/dev/null || echo "No context file found"
 ```
 
 Using the prd-template skill, create a comprehensive PRD with:
@@ -94,23 +94,22 @@ Using the prd-template skill, create a comprehensive PRD with:
 
 6. **Open Questions**
 
-Save the PRD to: `docs/planning/$ARGUMENTS/PRD.md`
+Save the PRD to: `.shipspec/planning/$ARGUMENTS/PRD.md`
 
 ### Review Gate
 
-After generating, tell the user:
+After generating, use the AskUserQuestion tool to get approval:
 
-> "**PRD generated and saved to `docs/planning/$ARGUMENTS/PRD.md`**
->
-> Please review the document.
->
-> Reply with:
-> - **'looks good'** or **'approved'** to continue to technical design
-> - Or describe any changes needed"
+- **Header**: "PRD Review"
+- **Question**: "PRD generated and saved to `.shipspec/planning/$ARGUMENTS/PRD.md`. Please review the document. Would you like to approve it or request changes?"
+- **Options**:
+  - **Approve**: "Continue to technical design phase"
+  - **Request changes**: "I'll describe changes needed"
 
-**WAIT for user approval before proceeding to Phase 4.**
+**WAIT for user response before proceeding.**
 
-If the user requests changes, update the PRD and ask for review again.
+- If **"Approve"** selected: Continue to Phase 4.
+- If **"Request changes"** selected: Ask user to describe the changes, update the PRD, then ask for review again.
 
 ---
 
@@ -139,11 +138,11 @@ When the user indicates technical decisions are complete, proceed to Phase 5.
 ## Phase 5/6: Generate SDD
 
 Load the PRD:
-@docs/planning/$ARGUMENTS/PRD.md
+@.shipspec/planning/$ARGUMENTS/PRD.md
 
 Load context:
 ```bash
-cat docs/planning/$ARGUMENTS/context.md 2>/dev/null || echo "No context file"
+cat .shipspec/planning/$ARGUMENTS/context.md 2>/dev/null || echo "No context file"
 ```
 
 Using the sdd-template skill, create a comprehensive design document with all 8 sections:
@@ -159,28 +158,27 @@ Using the sdd-template skill, create a comprehensive design document with all 8 
 
 Ensure every requirement from the PRD is addressed with traceability.
 
-Save the SDD to: `docs/planning/$ARGUMENTS/SDD.md`
+Save the SDD to: `.shipspec/planning/$ARGUMENTS/SDD.md`
 
 ### Review Gate
 
-After generating, tell the user:
+After generating, summarize the key design decisions and use the AskUserQuestion tool to get approval:
 
-> "**SDD generated and saved to `docs/planning/$ARGUMENTS/SDD.md`**
->
-> Key design decisions:
+> **Key design decisions:**
 > - [Decision 1]
 > - [Decision 2]
 > - [Decision 3]
->
-> Please review the technical design.
->
-> Reply with:
-> - **'looks good'** or **'approved'** to generate implementation tasks
-> - Or describe any changes needed"
 
-**WAIT for user approval before proceeding to Phase 6.**
+- **Header**: "SDD Review"
+- **Question**: "SDD generated and saved to `.shipspec/planning/$ARGUMENTS/SDD.md`. Please review the technical design. Would you like to approve it or request changes?"
+- **Options**:
+  - **Approve**: "Continue to generate implementation tasks"
+  - **Request changes**: "I'll describe changes needed"
 
-If the user requests changes, update the SDD and ask for review again.
+**WAIT for user response before proceeding.**
+
+- If **"Approve"** selected: Continue to Phase 6.
+- If **"Request changes"** selected: Ask user to describe the changes, update the SDD, then ask for review again.
 
 ---
 
@@ -189,12 +187,12 @@ If the user requests changes, update the SDD and ask for review again.
 Once the SDD is approved, automatically generate implementation tasks.
 
 Load the planning documents:
-@docs/planning/$ARGUMENTS/PRD.md
-@docs/planning/$ARGUMENTS/SDD.md
+@.shipspec/planning/$ARGUMENTS/PRD.md
+@.shipspec/planning/$ARGUMENTS/SDD.md
 
 Load context:
 ```bash
-cat docs/planning/$ARGUMENTS/context.md 2>/dev/null || echo "No context file"
+cat .shipspec/planning/$ARGUMENTS/context.md 2>/dev/null || echo "No context file"
 ```
 
 Delegate to the `task-planner` subagent to:
@@ -223,7 +221,17 @@ Using the agent-prompts skill, create a comprehensive task list with:
    - Dependencies clearly marked
    - Acceptance criteria
 
-Save the tasks to: `docs/planning/$ARGUMENTS/TASKS.md`
+Save the tasks to: `.shipspec/planning/$ARGUMENTS/TASKS.md`
+
+### Cleanup Temporary Files
+
+After tasks are generated successfully, clean up the temporary context file:
+
+```bash
+rm -f .shipspec/planning/$ARGUMENTS/context.md
+```
+
+The context information is now incorporated into the PRD, SDD, and TASKS.md files.
 
 ---
 
@@ -240,10 +248,9 @@ After all phases complete, provide:
 > - Critical Path: [list]
 >
 > **Generated Documents:**
-> - `docs/planning/$ARGUMENTS/context.md` - Codebase context
-> - `docs/planning/$ARGUMENTS/PRD.md` - Product requirements
-> - `docs/planning/$ARGUMENTS/SDD.md` - Technical design
-> - `docs/planning/$ARGUMENTS/TASKS.md` - Implementation tasks
+> - `.shipspec/planning/$ARGUMENTS/PRD.md` - Product requirements
+> - `.shipspec/planning/$ARGUMENTS/SDD.md` - Technical design
+> - `.shipspec/planning/$ARGUMENTS/TASKS.md` - Implementation tasks
 >
 > **Next Steps:**
 > Run `/implement-next-task` to start implementing the first task.

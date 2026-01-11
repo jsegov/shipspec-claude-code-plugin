@@ -13,7 +13,7 @@ Find and display the next task ready for implementation, verifying any in-progre
 Check that TASKS.md exists:
 ```bash
 echo "=== Checking TASKS.md ==="
-ls -la docs/planning/$ARGUMENTS/TASKS.md 2>/dev/null || echo "TASKS.md NOT FOUND"
+ls -la .shipspec/planning/$ARGUMENTS/TASKS.md 2>/dev/null || echo "TASKS.md NOT FOUND"
 ```
 
 If TASKS.md is not found, tell the user:
@@ -22,7 +22,7 @@ If TASKS.md is not found, tell the user:
 ## Step 2: Load and Parse Tasks
 
 Load the tasks document:
-@docs/planning/$ARGUMENTS/TASKS.md
+@.shipspec/planning/$ARGUMENTS/TASKS.md
 
 Parse the document to extract:
 1. **All tasks** with their IDs, titles, and statuses

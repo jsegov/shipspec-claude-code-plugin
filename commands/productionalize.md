@@ -13,7 +13,7 @@ Analyze the codebase for production readiness, identifying security vulnerabilit
 Create the output directory for analysis results:
 
 ```bash
-mkdir -p docs/planning/$ARGUMENTS
+mkdir -p .shipspec/planning/$ARGUMENTS
 ```
 
 ## Step 2: Gather Codebase Signals
@@ -28,7 +28,7 @@ Use the production-signals skill to detect:
 - Security configuration
 - Monitoring and observability
 
-Save signals to: `docs/planning/$ARGUMENTS/production-signals.md`
+Save signals to: `.shipspec/planning/$ARGUMENTS/production-signals.md`
 
 ## Step 3: Gather Production Context
 
@@ -70,7 +70,7 @@ Delegate to the `production-reporter` subagent to generate:
 1. **production-report.md** - Executive summary, findings by category, compliance matrix, remediation roadmap
 2. **fix-prompts.md** - Agent-ready prompts for each finding
 
-Save to: `docs/planning/$ARGUMENTS/`
+Save to: `.shipspec/planning/$ARGUMENTS/`
 
 ## Step 6: Present Results
 
@@ -79,9 +79,9 @@ After report generation, present a summary:
 > **Production Readiness Analysis Complete**
 >
 > **Output files:**
-> - `docs/planning/$ARGUMENTS/production-signals.md` - Detected tech stack and infrastructure
-> - `docs/planning/$ARGUMENTS/production-report.md` - Full analysis report
-> - `docs/planning/$ARGUMENTS/fix-prompts.md` - Agent-ready fix prompts
+> - `.shipspec/planning/$ARGUMENTS/production-signals.md` - Detected tech stack and infrastructure
+> - `.shipspec/planning/$ARGUMENTS/production-report.md` - Full analysis report
+> - `.shipspec/planning/$ARGUMENTS/fix-prompts.md` - Agent-ready fix prompts
 >
 > **Summary:**
 > - Overall Status: [Ready/Ready with Reservations/Not Ready]
