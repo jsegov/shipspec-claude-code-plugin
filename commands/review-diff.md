@@ -126,6 +126,8 @@ Store the list of changed files for reference in validation steps.
 >
 > If you've already committed, you can still verify manually or use `/implement-next-task $ARGUMENTS` to check acceptance criteria."
 
+**Stop here** - cannot review without uncommitted changes to analyze.
+
 ## Step 4: Load Planning Artifacts (Feature Planning Only)
 
 **For Feature Planning workflow**, load the PRD and SDD for reference:
@@ -178,7 +180,7 @@ For each criterion:
 | 2 | [criterion text] | PASS/FAIL | [brief evidence] |
 ...
 
-**Result:** X/Y criteria passed
+**Result:** X passed, Y failed, Z could not verify
 ```
 
 ## Step 6: Validate Design Alignment (Feature Planning Only)
@@ -279,12 +281,13 @@ Compile results from all three validation categories:
 **Determine overall verdict:**
 
 **APPROVED** (all validations pass):
-- All acceptance criteria passed (must have at least one criterion)
+- No acceptance criteria FAILED (CANNOT_VERIFY is acceptable)
+- At least one criterion exists
 - Design alignment verified (or N/A if no reference or Production Readiness workflow)
 - All requirements satisfied (or N/A if no reference or Production Readiness workflow)
 
 **NEEDS WORK** (any validation fails):
-- One or more acceptance criteria failed
+- One or more acceptance criteria FAILED
 - OR design misalignment detected
 - OR requirements not satisfied
 
@@ -306,9 +309,9 @@ Compile results from all three validation categories:
 > All validations passed! Task **[TASK-ID]: [Title]** has been marked as complete.
 >
 > **Summary:**
-> - Acceptance Criteria: X/X passed
-> - Design Alignment: Verified
-> - Requirements: X/X satisfied
+> - Acceptance Criteria: X passed [Y could not verify - review manually]
+> - Design Alignment: [Verified | N/A for Production Readiness]
+> - Requirements: [X/X satisfied | N/A for Production Readiness]
 >
 > **Next Steps:**
 > - Commit your changes: `git add . && git commit -m "Complete [TASK-ID]: [Title]"`
