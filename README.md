@@ -31,7 +31,7 @@ ShipSpec replaces vague plans with structured PRDs, technical designs, and order
 ## Installation
 
 ```bash
-/plugin marketplace add jsegov/shipspec-marketplace
+/plugin marketplace add jsegov/shipspec-claude-code-plugin
 /plugin install shipspec@shipspec-marketplace
 ```
 
