@@ -1,7 +1,7 @@
 ---
 description: Implement all tasks for a feature end-to-end automatically
 argument-hint: <feature-name>
-allowed-tools: Read, Glob, Grep, Write, Edit, Bash(cat:*), Bash(ls:*), Bash(find:*), Bash(git:*), Bash(head:*), Bash(wc:*), Bash(npm:*), Bash(npx:*), Bash(yarn:*), Bash(pnpm:*), Bash(bun:*), Bash(cargo:*), Bash(make:*), Bash(pytest:*), Bash(go:*), Bash(mypy:*), Bash(ruff:*), Bash(flake8:*), Bash(golangci-lint:*), Task, AskUserQuestion
+allowed-tools: Read, Glob, Grep, Write, Edit, Bash(cat:*), Bash(ls:*), Bash(find:*), Bash(git:*), Bash(head:*), Bash(wc:*), Bash(npm:*), Bash(npx:*), Bash(yarn:*), Bash(pnpm:*), Bash(bun:*), Bash(cargo:*), Bash(make:*), Bash(pytest:*), Bash(go:*), Bash(mypy:*), Bash(ruff:*), Bash(flake8:*), Bash(golangci-lint:*), Bash(rm:*), Bash(mkdir:*), Task, AskUserQuestion
 ---
 
 # Implement Feature: $ARGUMENTS
@@ -125,10 +125,15 @@ Show the warning message from task-manager and **stop** - wait for user to resol
 
    **If INCOMPLETE:**
    - Tell user: "Task [TASK-ID] not yet complete. Continuing implementation..."
-   - **Create feature retry state file** for auto-retry:
+   - **Create feature retry state file** for auto-retry (only if not already retrying this task):
      ```bash
      mkdir -p .claude
-     cat > .claude/shipspec-feature-retry.local.md << 'EOF'
+     STATE_FILE=".claude/shipspec-feature-retry.local.md"
+     # Check if we're already retrying the SAME task (preserve counter for retry)
+     EXISTING_TASK=$(grep "^current_task_id:" "$STATE_FILE" 2>/dev/null | sed 's/current_task_id: //' || echo "")
+     if [[ "$EXISTING_TASK" != "[task-id]" ]]; then
+       # New task or no state file - create fresh with counter=1
+       cat > "$STATE_FILE" << 'EOF'
      ---
      active: true
      feature: $ARGUMENTS
@@ -142,6 +147,8 @@ Show the warning message from task-manager and **stop** - wait for user to resol
 
      [Full task prompt from task-manager]
      EOF
+     fi
+     # If same task, skip creation - hook will increment counter
      ```
    - **IMPLEMENT THE TASK**:
      - Read the task prompt carefully
@@ -227,10 +234,15 @@ Once a ready task is found:
    - Operation: `get_task`
    - Task ID: [the ready task ID from step 4.1]
 
-5. **Create feature retry state file** for auto-retry on failure:
+5. **Create feature retry state file** for auto-retry on failure (only if not already retrying this task):
    ```bash
    mkdir -p .claude
-   cat > .claude/shipspec-feature-retry.local.md << 'EOF'
+   STATE_FILE=".claude/shipspec-feature-retry.local.md"
+   # Check if we're already retrying the SAME task (preserve counter for retry)
+   EXISTING_TASK=$(grep "^current_task_id:" "$STATE_FILE" 2>/dev/null | sed 's/current_task_id: //' || echo "")
+   if [[ "$EXISTING_TASK" != "[task-id]" ]]; then
+     # New task or no state file - create fresh with counter=1
+     cat > "$STATE_FILE" << 'EOF'
    ---
    active: true
    feature: $ARGUMENTS
@@ -244,6 +256,8 @@ Once a ready task is found:
 
    [Full task prompt from task-manager]
    EOF
+   fi
+   # If same task, skip creation - hook will increment counter
    ```
 
 6. **IMPLEMENT THE TASK**:
