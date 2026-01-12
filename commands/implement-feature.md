@@ -296,6 +296,11 @@ Compile results from all three validation categories:
 - OR design alignment FAILED (implementation doesn't match design)
 - OR requirements FAILED (implementation doesn't satisfy requirements)
 
+**BLOCKED** (cannot verify):
+- One or more tasks returned BLOCKED from task-verifier
+- AND no explicit FAILED criteria exist (otherwise it's NEEDS WORK)
+- Examples: missing test infrastructure, cannot run type checker, missing acceptance criteria
+
 ### 5.6: Take Action Based on Verdict
 
 **If APPROVED:**
@@ -335,6 +340,25 @@ Compile results from all three validation categories:
 > ---
 >
 > After fixing these issues, run `/implement-feature $ARGUMENTS` again to re-validate."
+
+**If BLOCKED:**
+
+> "## BLOCKED
+>
+> Cannot complete feature review due to missing infrastructure or requirements.
+>
+> **Blocked Tasks:**
+>
+> | Task | Issue | Resolution |
+> |------|-------|------------|
+> | [TASK-ID] | [What's blocking] | [How to fix] |
+>
+> **Common Resolutions:**
+> - **Missing test infrastructure**: Set up testing framework (e.g., `npm init jest`, `pytest`)
+> - **Missing acceptance criteria**: Add acceptance criteria to tasks in TASKS.md
+> - **Missing type checker**: Install and configure type checking (e.g., TypeScript, mypy)
+>
+> After resolving the blocking issues, run `/implement-feature $ARGUMENTS` again."
 
 ---
 

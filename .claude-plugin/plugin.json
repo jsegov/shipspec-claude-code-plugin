@@ -1,7 +1,7 @@
 {
   "name": "shipspec",
-  "description": "AI-assisted feature planning and production readiness: conversational PRD gathering, technical design generation, task decomposition, and comprehensive code analysis for security, compliance, and deployment",
-  "version": "0.2.0",
+  "description": "Spec-driven development for Claude Code. Plan bigger features with persistent PRDs, technical designs, and implementation tasks that keep your AI coding agent on track across sessions.",
+  "version": "1.0.0",
   "author": {
     "name": "ShipSpec"
   },

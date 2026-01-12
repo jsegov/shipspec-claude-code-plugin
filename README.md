@@ -1,23 +1,34 @@
 # ShipSpec Claude Code Plugin
 
-**Spec-driven development for Claude Code.** Plan features systematically before writing code—transform ideas into well-structured PRDs, technical designs, and implementation tasks.
+**Ship bigger features with confidence.**
 
-Spec-driven development ensures you think through requirements and architecture before implementation, resulting in better code, fewer rewrites, and clearer communication.
+Vibe coding works great for small tasks, but it breaks down as features get bigger. Claude's native plan mode helps, but plans stay in the conversation—they're too vague for multi-session work, leading to context loss, contradictions, and hallucinations.
+
+ShipSpec fixes this with **spec-driven development**: persistent PRDs, technical designs, and implementation tasks that keep your AI coding agent on track across sessions.
+
+## Why ShipSpec?
+
+| Problem | Solution |
+|---------|----------|
+| Plans disappear when context resets | Persistent docs in `.shipspec/planning/` |
+| Vague requirements cause hallucinations | Detailed PRD with numbered requirements |
+| Architecture decisions get forgotten | SDD captures design choices |
+| Large features feel chaotic | Tasks with acceptance criteria and verification |
+
+**The result**: Spend more time planning upfront, ship with fewer rewrites.
 
 ## Features
 
-- **Conversational PRD Gathering**: Structured interview process to extract clear requirements
+- **Conversational PRD Gathering**: Structured interview to extract clear requirements
 - **Codebase-Aware Design**: Technical designs grounded in your existing architecture
 - **Agent-Ready Tasks**: Implementation tasks with detailed prompts for coding agents
-- **Progressive Workflow**: Each phase builds on the previous
+- **Built-in Verification**: Each task is verified against acceptance criteria before moving on
 
 ## Installation
 
-### From Local Directory
-
 ```bash
-/plugin marketplace add shipspec/planning-plugin
-/plugin install shipspec@shipspec
+/plugin marketplace add jsegov/shipspec-marketplace
+/plugin install shipspec@shipspec-marketplace
 ```
 
 ## Usage
@@ -177,9 +188,9 @@ The `/implement-feature` command implements all tasks and runs a comprehensive f
 - **Use `/implement-task` to work through tasks manually**: Tracks progress and verifies completion
 - **Use `/implement-feature` for automation**: Implements all tasks and runs comprehensive final review
 
-## Contributing
+## Issues & Feedback
 
-Contributions welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+Found a bug or have a suggestion? [Submit an issue](https://github.com/jsegov/shipspec-claude-code-plugin/issues)
 
 ## License
 
