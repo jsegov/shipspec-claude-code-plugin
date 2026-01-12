@@ -4,14 +4,15 @@
 
 STATE_FILE=".claude/shipspec-feature-retry.local.md"
 
-# Read hook input from stdin (contains transcript_path)
-INPUT=$(cat)
-TRANSCRIPT_PATH=$(echo "$INPUT" | jq -r '.transcript_path // empty')
-
-# Exit early if no feature retry active
+# Exit early if no feature retry active - BEFORE consuming stdin
+# (Multiple hooks share stdin; inactive hooks must not consume it)
 if [[ ! -f "$STATE_FILE" ]]; then
   exit 0
 fi
+
+# Only read stdin if this hook is active
+INPUT=$(cat)
+TRANSCRIPT_PATH=$(echo "$INPUT" | jq -r '.transcript_path // empty')
 
 # Parse YAML frontmatter
 TASK_ATTEMPT=$(grep "^task_attempt:" "$STATE_FILE" | sed 's/task_attempt: //')

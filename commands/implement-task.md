@@ -153,6 +153,11 @@ $(date -u +%Y-%m-%dT%H:%M:%SZ) | [task-id] | VERIFY | [VERIFIED|INCOMPLETE|BLOCK
 - **INCOMPLETE**:
   - Keep the task as `[~]`
   - Show the user what's missing
+  - **Clean up loop state and output incomplete marker:**
+    ```bash
+    rm -f .claude/shipspec-task-loop.local.md
+    ```
+    Then output: `<task-loop-complete>INCOMPLETE</task-loop-complete>`
   - Tell user: "Task [TASK-ID] is not complete. Please address the issues above, then run this command again."
   - **Stop here** - don't proceed to next task
 
@@ -204,6 +209,11 @@ Check if the task has a `## References` section containing SDD or PRD references
 
    **If MISALIGNED:**
    - Show specific misalignment issues
+   - **Clean up loop state and output misaligned marker:**
+     ```bash
+     rm -f .claude/shipspec-task-loop.local.md
+     ```
+     Then output: `<task-loop-complete>MISALIGNED</task-loop-complete>`
    - Tell user: "Implementation doesn't match design/requirements. Please fix the issues above."
    - Keep task as `[~]`, **stop here**
 

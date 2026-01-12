@@ -4,14 +4,15 @@
 
 STATE_FILE=".claude/shipspec-task-loop.local.md"
 
-# Read hook input from stdin (contains transcript_path)
-INPUT=$(cat)
-TRANSCRIPT_PATH=$(echo "$INPUT" | jq -r '.transcript_path // empty')
-
-# Exit early if no active loop
+# Exit early if no active loop - BEFORE consuming stdin
+# (Multiple hooks share stdin; inactive hooks must not consume it)
 if [[ ! -f "$STATE_FILE" ]]; then
   exit 0
 fi
+
+# Only read stdin if this hook is active
+INPUT=$(cat)
+TRANSCRIPT_PATH=$(echo "$INPUT" | jq -r '.transcript_path // empty')
 
 # Parse YAML frontmatter
 ITERATION=$(grep "^iteration:" "$STATE_FILE" | sed 's/iteration: //')
@@ -45,6 +46,16 @@ if [[ -n "$TRANSCRIPT_PATH" ]] && [[ -f "$TRANSCRIPT_PATH" ]]; then
   if echo "$LAST_OUTPUT" | grep -q '<task-loop-complete>BLOCKED</task-loop-complete>'; then
     rm -f "$STATE_FILE"
     exit 0  # Allow exit - task blocked, needs manual intervention
+  fi
+
+  if echo "$LAST_OUTPUT" | grep -q '<task-loop-complete>INCOMPLETE</task-loop-complete>'; then
+    rm -f "$STATE_FILE"
+    exit 0  # Allow exit - task incomplete, needs manual fixes
+  fi
+
+  if echo "$LAST_OUTPUT" | grep -q '<task-loop-complete>MISALIGNED</task-loop-complete>'; then
+    rm -f "$STATE_FILE"
+    exit 0  # Allow exit - implementation misaligned with planning
   fi
 fi
 

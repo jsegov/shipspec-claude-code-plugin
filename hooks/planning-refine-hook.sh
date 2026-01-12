@@ -4,14 +4,15 @@
 
 STATE_FILE=".claude/shipspec-planning-refine.local.md"
 
-# Read hook input from stdin
-INPUT=$(cat)
-TRANSCRIPT_PATH=$(echo "$INPUT" | jq -r '.transcript_path // empty')
-
-# Exit early if no refinement active
+# Exit early if no refinement active - BEFORE consuming stdin
+# (Multiple hooks share stdin; inactive hooks must not consume it)
 if [[ ! -f "$STATE_FILE" ]]; then
   exit 0
 fi
+
+# Only read stdin if this hook is active
+INPUT=$(cat)
+TRANSCRIPT_PATH=$(echo "$INPUT" | jq -r '.transcript_path // empty')
 
 # Parse YAML frontmatter
 ITERATION=$(grep "^iteration:" "$STATE_FILE" | sed 's/iteration: //')
