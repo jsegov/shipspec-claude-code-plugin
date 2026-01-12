@@ -49,6 +49,12 @@ You will receive:
 
 Parse the task prompt to find the `## Acceptance Criteria` section. Each line starting with `- [ ]` or `- [x]` is a criterion to verify.
 
+**If no Acceptance Criteria section is found OR the section has no criteria items:**
+- Set status to **BLOCKED**
+- Report: "No acceptance criteria found in task prompt. A task without acceptance criteria cannot be auto-verified."
+- Recommendation: "Add an `## Acceptance Criteria` section to the task in TASKS.md with specific, testable criteria."
+- **Stop here** - do not proceed to Step 2
+
 ### Step 2: Categorize Each Criterion
 
 For each criterion, determine the verification method:

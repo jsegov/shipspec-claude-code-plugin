@@ -90,9 +90,19 @@ Before starting the loop, check if there's already a task marked `[~]`:
 
 **If an in-progress task is found:**
 1. Tell user: "Found in-progress task: **[TASK-ID]: [Title]**. Resuming implementation..."
-2. Continue implementing from where it left off
-3. Mark as `[x]` when implementation is complete
-4. Continue to the main loop
+
+2. **Extract the full task prompt**: Get all content from the task header until the next task header
+
+3. **IMPLEMENT THE TASK**:
+   - Read the task prompt carefully
+   - Identify files to create or modify
+   - Write the actual code following the implementation notes
+   - Run any specified build/test commands as you implement
+   - Follow the acceptance criteria to guide what needs to be done
+
+4. Mark as `[x]` when implementation is complete
+
+5. Continue to the main loop
 
 ## Step 4: Main Implementation Loop
 
