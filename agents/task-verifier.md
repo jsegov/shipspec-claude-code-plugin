@@ -45,6 +45,22 @@ You will receive:
 
 ## Verification Process
 
+### Step 0: Check for Completion Promise
+
+If the task prompt contains a `## Completion Promise` section:
+
+1. Extract the promise text (the identifier between `<promise>` tags expected)
+2. Search recent assistant messages in the conversation for `<promise>EXACT_TEXT</promise>`
+3. **If promise found and matches exactly:**
+   - Set `promise_matched = true`
+   - Note in report: "Completion promise detected and matched"
+4. **If promise section exists but no matching promise found:**
+   - Set `promise_matched = false`
+   - Continue to Step 1 (standard verification applies)
+5. **If task has NO Completion Promise section:**
+   - Set `promise_matched = false` (not applicable)
+   - Continue to Step 1 normally
+
 ### Step 1: Extract Acceptance Criteria
 
 Parse the task prompt to find the `## Acceptance Criteria` section. Each line starting with `- [ ]` or `- [x]` is a criterion to verify.
@@ -198,10 +214,24 @@ git diff --name-only HEAD~5
 ## Edge Cases
 
 ### Cannot Verify
-If a criterion cannot be verified (e.g., "User experience is smooth"), mark as CANNOT_VERIFY and note why:
-- Requires manual testing
-- Requires running application
-- Subjective criterion
+
+If a criterion cannot be verified, behavior depends on whether a completion promise was matched in Step 0:
+
+**If completion promise WAS matched (promise_matched = true):**
+- Treat subjective CANNOT_VERIFY criteria as PASS
+- The developer's promise signal counts as explicit verification
+- Example: If criterion is "Documentation is clear (SUBJECTIVE)" and promise matched → PASS
+- Non-subjective CANNOT_VERIFY items (e.g., missing test infrastructure) remain CANNOT_VERIFY
+
+**If completion promise was NOT matched:**
+- Mark subjective criteria as CANNOT_VERIFY with reason:
+  - Requires manual testing
+  - Requires running application
+  - Subjective criterion
+- These do NOT block task completion
+
+**How to identify subjective criteria:**
+Look for markers like "(SUBJECTIVE)", "(subjective)", "clear", "intuitive", "smooth", "user experience" in the criterion text.
 
 ### Partial Completion
 If some criteria pass but others fail, status is INCOMPLETE. List exactly what needs to be fixed.
@@ -233,3 +263,28 @@ Always end with one of these clear verdicts:
 3. **Be helpful**: If something fails, explain how to fix it
 4. **Be honest**: If you can't verify something, say so
 5. **Check related files**: Sometimes implementation spans multiple files
+
+## Completion Promise Format
+
+Tasks with subjective criteria can include this section to enable explicit completion signals:
+
+```markdown
+## Completion Promise
+
+To signal completion, output: <promise>UNIQUE_IDENTIFIER</promise>
+
+**This promise should only be output when:**
+- [List specific conditions for this task]
+
+Do NOT output this promise if unsure or to exit early.
+```
+
+**Promise requirements:**
+- The promise text must be a meaningful identifier (e.g., "API_DESIGN_COMPLETE", "DATABASE_SCHEMA_DONE")
+- Must appear verbatim in `<promise>TEXT</promise>` XML tags
+- Match is case-sensitive with no extra whitespace
+
+**When promise is matched:**
+- Subjective criteria marked "(SUBJECTIVE)" are treated as PASS
+- Non-subjective CANNOT_VERIFY items still remain CANNOT_VERIFY
+- Report notes: "Completion promise detected and matched"

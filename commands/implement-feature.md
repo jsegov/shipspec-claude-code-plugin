@@ -103,21 +103,72 @@ Show the warning message from task-manager and **stop** - wait for user to resol
 
 4. **Based on verification result:**
 
+   **Log verification** to `.claude/shipspec-debug.log`:
+   ```
+   $(date -u +%Y-%m-%dT%H:%M:%SZ) | [task-id] | VERIFY | [result] | [details]
+   ```
+
    **If VERIFIED:**
    - Update task status from `[~]` to `[x]` in TASKS.md
+   - **Log task completion** to `.claude/shipspec-debug.log`:
+     ```
+     $(date -u +%Y-%m-%dT%H:%M:%SZ) | [task-id] | COMPLETE | Status updated to [x]
+     ```
+   - **Clean up any existing feature retry state:**
+     ```bash
+     rm -f .claude/shipspec-feature-retry.local.md
+     ```
+   - **Output completion marker:**
+     `<feature-task-complete>VERIFIED</feature-task-complete>`
    - Tell user: "Task [TASK-ID] verified complete! Marking as done and continuing..."
    - Continue to Step 4 (main loop)
 
-   **If INCOMPLETE or BLOCKED:**
+   **If INCOMPLETE:**
    - Tell user: "Task [TASK-ID] not yet complete. Continuing implementation..."
+   - **Create feature retry state file** for auto-retry:
+     ```bash
+     mkdir -p .claude
+     cat > .claude/shipspec-feature-retry.local.md << 'EOF'
+     ---
+     active: true
+     feature: $ARGUMENTS
+     current_task_id: [task-id]
+     task_attempt: 1
+     max_task_attempts: 5
+     total_tasks: [total count]
+     tasks_completed: [completed count]
+     started_at: "[ISO timestamp]"
+     ---
+
+     [Full task prompt from task-manager]
+     EOF
+     ```
    - **IMPLEMENT THE TASK**:
      - Read the task prompt carefully
      - Identify files to create or modify
      - Write the actual code following the implementation notes
      - Run any specified build/test commands as you implement
      - Follow the acceptance criteria to guide what needs to be done
-   - Mark as `[x]` when implementation is complete
-   - Continue to Step 4 (main loop)
+   - After implementation, delegate to `task-verifier` to verify the task
+   - **If VERIFIED after implementation:**
+     - Mark as `[x]` in TASKS.md
+     - Log task completion
+     - Clean up state file: `rm -f .claude/shipspec-feature-retry.local.md`
+     - Output: `<feature-task-complete>VERIFIED</feature-task-complete>`
+     - Continue to Step 4 (main loop)
+   - **If still INCOMPLETE:**
+     - DO NOT output completion marker (stop hook will trigger retry)
+     - Show what failed to user
+
+   **If BLOCKED:**
+   - **Clean up any existing feature retry state:**
+     ```bash
+     rm -f .claude/shipspec-feature-retry.local.md
+     ```
+   - **Output blocked marker:**
+     `<feature-task-complete>BLOCKED</feature-task-complete>`
+   - Tell user: "Task [TASK-ID] is blocked: [reason]. Manual intervention required."
+   - Ask user how to proceed (skip task, abort feature, or manual fix)
 
 **If NONE:**
 Continue to Step 4 (main loop).
@@ -157,7 +208,12 @@ Once a ready task is found:
 1. **Update TASKS.md**: Change status from `[ ]` to `[~]`
    - Find `### - [ ] TASK-XXX:` -> Replace with `### - [~] TASK-XXX:`
 
-2. **Display task header**:
+2. **Log task start** to `.claude/shipspec-debug.log`:
+   ```
+   $(date -u +%Y-%m-%dT%H:%M:%SZ) | [task-id] | START | [X/TOTAL] [title]
+   ```
+
+3. **Display task header**:
 > "---
 >
 > ## [X/TOTAL] Implementing: [TASK-ID] - [Title]
@@ -166,21 +222,66 @@ Once a ready task is found:
 >
 > ---"
 
-3. **Get full task prompt** by delegating to `task-manager` with:
+4. **Get full task prompt** by delegating to `task-manager` with:
    - Feature name: $ARGUMENTS
    - Operation: `get_task`
    - Task ID: [the ready task ID from step 4.1]
 
-4. **IMPLEMENT THE TASK**:
+5. **Create feature retry state file** for auto-retry on failure:
+   ```bash
+   mkdir -p .claude
+   cat > .claude/shipspec-feature-retry.local.md << 'EOF'
+   ---
+   active: true
+   feature: $ARGUMENTS
+   current_task_id: [task-id]
+   task_attempt: 1
+   max_task_attempts: 5
+   total_tasks: [total count]
+   tasks_completed: [completed count]
+   started_at: "[ISO timestamp]"
+   ---
+
+   [Full task prompt from task-manager]
+   EOF
+   ```
+
+6. **IMPLEMENT THE TASK**:
    - Read the task prompt carefully
    - Identify files to create or modify
    - Write the actual code following the implementation notes
    - Run any specified build/test commands as you implement
    - Follow the acceptance criteria to guide what needs to be done
 
-5. **Mark task complete**: After implementation, update TASKS.md from `[~]` to `[x]`
+### 4.4: Verify and Handle Result
 
-6. **Show progress**:
+After implementation, verify the task:
+
+1. **Delegate to task-verifier** agent with:
+   - The full task prompt including acceptance criteria
+   - The feature name ($ARGUMENTS)
+   - The task ID
+
+2. **Log verification** to `.claude/shipspec-debug.log`:
+   ```
+   $(date -u +%Y-%m-%dT%H:%M:%SZ) | [task-id] | VERIFY | [result] | [details]
+   ```
+
+3. **Handle verification result:**
+
+**If VERIFIED:**
+- Update TASKS.md from `[~]` to `[x]`
+- **Log task completion** to `.claude/shipspec-debug.log`:
+  ```
+  $(date -u +%Y-%m-%dT%H:%M:%SZ) | [task-id] | COMPLETE | Status updated to [x]
+  ```
+- **Clean up state file:**
+  ```bash
+  rm -f .claude/shipspec-feature-retry.local.md
+  ```
+- **Output completion marker:**
+  `<feature-task-complete>VERIFIED</feature-task-complete>`
+- **Show progress**:
 > "**Progress: [X/TOTAL]**
 >
 > | Status | Count |
@@ -188,15 +289,40 @@ Once a ready task is found:
 > | Completed | X |
 > | Remaining | Y |
 >
-> *Continuing to next task...*"
+> *Task verified! Continuing to next task...*"
+- Return to Step 4.1 to find the next task.
 
-7. Return to Step 4.1 to find the next task.
+**If INCOMPLETE:**
+- DO NOT output completion marker (stop hook will trigger retry)
+- Keep task as `[~]` in TASKS.md
+- Show what failed to user:
+> "**Verification Failed**
+>
+> The following criteria are not met:
+> - [List failed criteria]
+>
+> The loop will retry automatically."
+
+**If BLOCKED:**
+- **Clean up state file:**
+  ```bash
+  rm -f .claude/shipspec-feature-retry.local.md
+  ```
+- **Output blocked marker:**
+  `<feature-task-complete>BLOCKED</feature-task-complete>`
+- Tell user: "Task [TASK-ID] is blocked: [reason]. Manual intervention required."
+- Ask user how to proceed (skip task, abort feature, or manual fix)
 
 ---
 
 ## Step 5: Final Feature Review
 
 After all tasks are marked complete, perform a comprehensive review of the entire feature implementation.
+
+**Clean up any remaining state file:**
+```bash
+rm -f .claude/shipspec-feature-retry.local.md
+```
 
 > "## All Tasks Implemented!
 >
@@ -323,6 +449,11 @@ Compile results from all three validation categories:
 - AND no explicit FAILED criteria exist (otherwise it's NEEDS WORK)
 - Examples: missing test infrastructure, cannot run type checker, missing acceptance criteria
 
+**Log final review result** to `.claude/shipspec-debug.log`:
+```
+$(date -u +%Y-%m-%dT%H:%M:%SZ) | FEATURE | REVIEW | [verdict] | [summary e.g., "5/5 tasks verified" or "2 criteria failed"]
+```
+
 ### 5.5: Take Action Based on Verdict
 
 **If APPROVED:**
@@ -341,6 +472,9 @@ Compile results from all three validation categories:
 > - Review the changes: `git diff`
 > - Commit your changes: `git add . && git commit -m "Implement $ARGUMENTS feature"`
 > - Create a pull request if needed"
+
+**Output feature complete marker:**
+`<feature-complete>APPROVED</feature-complete>`
 
 **If APPROVED WITH WARNINGS:**
 
@@ -370,6 +504,9 @@ Compile results from all three validation categories:
 > - Review the unverified references above
 > - If satisfied, proceed with: `git add . && git commit -m "Implement $ARGUMENTS feature"`
 > - If references need fixing, update the planning artifacts and re-run `/implement-feature $ARGUMENTS`"
+
+**Output feature complete marker:**
+`<feature-complete>APPROVED_WITH_WARNINGS</feature-complete>`
 
 **If NEEDS WORK:**
 

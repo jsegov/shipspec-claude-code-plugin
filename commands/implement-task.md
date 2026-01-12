@@ -142,6 +142,11 @@ Delegate to the `task-verifier` subagent with:
 
 **Based on verification result:**
 
+**Log verification result** to `.claude/shipspec-debug.log`:
+```
+$(date -u +%Y-%m-%dT%H:%M:%SZ) | [task-id] | VERIFY | [VERIFIED|INCOMPLETE|BLOCKED] | [brief failure reason if any]
+```
+
 - **VERIFIED**:
   - Continue to Step 4.5 to validate planning alignment (if task has references)
 
@@ -154,6 +159,11 @@ Delegate to the `task-verifier` subagent with:
 - **BLOCKED**:
   - Keep the task as `[~]`
   - Show the blocking reason
+  - **Clean up loop state and output blocked marker:**
+    ```bash
+    rm -f .claude/shipspec-task-loop.local.md
+    ```
+    Then output: `<task-loop-complete>BLOCKED</task-loop-complete>`
   - Ask user how they want to proceed
 
 **If NONE:**
@@ -179,6 +189,15 @@ Check if the task has a `## References` section containing SDD or PRD references
    **If ALIGNED:**
    - Tell user: "Planning alignment verified."
    - Update task status from `[~]` to `[x]` in TASKS.md
+   - **Log task completion** to `.claude/shipspec-debug.log`:
+     ```
+     $(date -u +%Y-%m-%dT%H:%M:%SZ) | [task-id] | COMPLETE | Status updated to [x]
+     ```
+   - **Clean up loop state and output completion marker:**
+     ```bash
+     rm -f .claude/shipspec-task-loop.local.md
+     ```
+     Then output: `<task-loop-complete>VERIFIED</task-loop-complete>`
    - Tell user: "Task [TASK-ID] complete! Moving to next task..."
    - If task-id was specified and matches: **Stop here** - the requested task is complete
    - Otherwise: Continue to Step 5
@@ -192,12 +211,30 @@ Check if the task has a `## References` section containing SDD or PRD references
    - Show missing references
    - Tell user: "Warning: Some planning references could not be verified. Consider updating references in TASKS.md or planning documents."
    - Update task status from `[~]` to `[x]` in TASKS.md (warning only, not blocking)
+   - **Log task completion** to `.claude/shipspec-debug.log`:
+     ```
+     $(date -u +%Y-%m-%dT%H:%M:%SZ) | [task-id] | COMPLETE | Status updated to [x] (with warnings)
+     ```
+   - **Clean up loop state and output completion marker:**
+     ```bash
+     rm -f .claude/shipspec-task-loop.local.md
+     ```
+     Then output: `<task-loop-complete>VERIFIED</task-loop-complete>`
    - Tell user: "Task [TASK-ID] complete with warnings. Moving to next task..."
    - If task-id was specified and matches: **Stop here**
    - Otherwise: Continue to Step 5
 
 **If the task has NO References section:**
 - Update task status from `[~]` to `[x]` in TASKS.md
+- **Log task completion** to `.claude/shipspec-debug.log`:
+  ```
+  $(date -u +%Y-%m-%dT%H:%M:%SZ) | [task-id] | COMPLETE | Status updated to [x]
+  ```
+- **Clean up loop state and output completion marker:**
+  ```bash
+  rm -f .claude/shipspec-task-loop.local.md
+  ```
+  Then output: `<task-loop-complete>VERIFIED</task-loop-complete>`
 - Tell user: "Task [TASK-ID] verified complete! Moving to next task..."
 - If task-id was specified and matches: **Stop here**
 - Otherwise: Continue to Step 5
@@ -226,12 +263,17 @@ Once a target task is identified:
 1. **Update TASKS.md**: Change the task's status from `[ ]` to `[~]`
    - Find `### - [ ] TASK-XXX:` -> Replace with `### - [~] TASK-XXX:`
 
-2. **Get full task prompt** by delegating to `task-manager` with:
+2. **Log task start** to `.claude/shipspec-debug.log`:
+   ```
+   $(date -u +%Y-%m-%dT%H:%M:%SZ) | [task-id] | START | Implementing: [title]
+   ```
+
+3. **Get full task prompt** by delegating to `task-manager` with:
    - Feature name: [feature-dir]
    - Operation: `get_task`
    - Task ID: [the target task ID]
 
-3. **Display to user**:
+4. **Display to user**:
 
 > "## Starting Task: [TASK-ID]
 >
@@ -251,6 +293,36 @@ Once a target task is identified:
 > /implement-task [feature-dir]
 > ```
 > This will verify your work and move to the next task."
+
+## Step 6.5: Initialize Loop State
+
+After starting the task, create the loop state file for automatic retry:
+
+```bash
+mkdir -p .claude
+cat > .claude/shipspec-task-loop.local.md << 'EOF'
+---
+active: true
+feature: [feature-dir]
+task_id: [task-id]
+iteration: 1
+max_iterations: 5
+started_at: "[ISO timestamp]"
+---
+
+[Full task prompt from task-manager]
+EOF
+```
+
+**Log loop start** to `.claude/shipspec-debug.log`:
+```
+$(date -u +%Y-%m-%dT%H:%M:%SZ) | [task-id] | LOOP_START | Attempt 1/5
+```
+
+**The stop hook will automatically:**
+- Retry if verification fails (up to 5 attempts)
+- Exit cleanly when `<task-loop-complete>VERIFIED</task-loop-complete>` is output
+- Exit cleanly when `<task-loop-complete>BLOCKED</task-loop-complete>` is output
 
 ## Step 7: Summary
 

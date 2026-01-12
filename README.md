@@ -192,6 +192,43 @@ The `/implement-feature` command implements all tasks and runs a comprehensive f
 - **Use `/implement-task` to work through tasks manually**: Tracks progress and verifies completion
 - **Use `/implement-feature` for automation**: Implements all tasks and runs comprehensive final review
 
+## Ralph Loop Methodology
+
+This plugin uses the [Ralph Loop](https://github.com/anthropics/claude-plugins-official/tree/main/plugins/ralph-loop) methodology for iterative, self-correcting implementation.
+
+### What is Ralph Loop?
+
+Ralph Loop is a development methodology based on continuous AI agent loops. The core concept: use a **Stop hook** to intercept Claude's exit attempts and feed the same prompt back until the task is complete. This creates a self-referential feedback loop where Claude iteratively improves its work.
+
+### How ShipSpec Uses It
+
+ShipSpec adapts Ralph Loop for structured feature development:
+
+| Feature | Ralph Loop Technique |
+|---------|---------------------|
+| `/implement-task` auto-retry | Stop hook blocks exit on failed verification, retries until VERIFIED or max attempts |
+| `/implement-feature` per-task retry | Same mechanism, applied to each task during full-feature implementation |
+| `/feature-planning` task refinement | Stop hook triggers re-analysis of large tasks (>5 story points) |
+
+### Key Components
+
+1. **Stop Hooks** - Intercept session exit and trigger retry loops
+2. **State Files** - Track iteration count and current task (`.claude/shipspec-*.local.md`)
+3. **Completion Markers** - Signal successful completion (`<task-loop-complete>VERIFIED</task-loop-complete>`)
+4. **Max Iterations** - Safety limit to prevent infinite loops (default: 5 attempts per task)
+
+### Philosophy
+
+From Ralph Loop:
+- **Iteration > Perfection** - Don't aim for perfect on first try; let the loop refine the work
+- **Failures Are Data** - Failed verification tells Claude exactly what to fix
+- **Persistence Wins** - Keep trying until success; the loop handles retry logic automatically
+
+### Learn More
+
+- [Ralph Loop Plugin](https://github.com/anthropics/claude-plugins-official/tree/main/plugins/ralph-loop)
+- [Original Ralph Technique](https://ghuntley.com/ralph/)
+
 ## Issues & Feedback
 
 Found a bug or have a suggestion? [Submit an issue](https://github.com/jsegov/shipspec-claude-code-plugin/issues)

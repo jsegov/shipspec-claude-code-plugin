@@ -323,6 +323,118 @@ The context and description are now incorporated into the PRD, SDD, and TASKS.md
 
 ---
 
+## Phase 8: Task Refinement (Optional)
+
+After generating TASKS.md, analyze task complexity to identify tasks that may be too large.
+
+### 8.1: Identify Large Tasks
+
+Parse TASKS.md and find tasks with estimated effort > 5 story points.
+
+**If no large tasks found:**
+> "All tasks are appropriately sized (≤5 story points). Skipping refinement."
+
+Skip to Completion Summary.
+
+**If large tasks found:**
+
+Show user:
+> "## Task Size Analysis
+>
+> Found **X tasks** with estimated effort > 5 story points:
+>
+> | Task | Title | Story Points |
+> |------|-------|--------------|
+> | TASK-003 | [Title] | 8 |
+> | TASK-007 | [Title] | 13 |
+>
+> Large tasks are harder to implement and verify. Would you like to auto-refine them into smaller subtasks?"
+
+Use AskUserQuestion with options:
+- "Yes, auto-refine large tasks"
+- "No, keep current breakdown"
+
+**If user chooses No:** Skip to Completion Summary.
+
+### 8.2: Initialize Refinement Loop
+
+Create state file:
+```bash
+mkdir -p .claude
+cat > .claude/shipspec-planning-refine.local.md << 'EOF'
+---
+active: true
+feature: [FEATURE_DIR]
+iteration: 1
+max_iterations: 3
+large_tasks:
+  - TASK-003
+  - TASK-007
+tasks_refined: 0
+---
+EOF
+```
+
+### 8.3: Refine Each Large Task
+
+For each task in large_tasks:
+
+1. Get full task details from TASKS.md
+2. Delegate to `task-planner` agent:
+   > "Break down TASK-XXX into 2-3 subtasks.
+   >
+   > Original task:
+   > [task prompt]
+   >
+   > Requirements:
+   > - Each subtask should be < 3 story points
+   > - Preserve the original acceptance criteria distributed across subtasks
+   > - Maintain dependency relationships
+   > - Use format TASK-XXX-A, TASK-XXX-B, etc. for subtask IDs"
+
+3. Replace original task with generated subtasks in TASKS.md
+4. Update dependencies pointing to original task
+5. Run task-manager validate to check no circular deps
+
+**If validation fails:**
+- Rollback changes
+- Mark task as "cannot refine"
+- Continue to next large task
+
+### 8.4: Check Completion
+
+After processing all large tasks:
+
+1. Re-analyze TASKS.md for tasks > 5 points
+2. If still have large tasks AND iteration < max_iterations:
+   - Increment iteration
+   - Add new large tasks to list
+   - Return to 8.3
+3. If no more large tasks OR max iterations:
+   - Clean up state file
+   - Show summary
+
+### 8.5: Summary
+
+> "## Task Refinement Complete
+>
+> **Results:**
+> - Original large tasks: X
+> - Successfully refined: Y
+> - Could not refine: Z
+>
+> **New task count:** N (was M)"
+
+**Output completion marker:**
+`<planning-refine-complete>`
+
+Clean up:
+```bash
+rm -f .claude/shipspec-planning-refine.local.md
+```
+
+---
+
 ## Completion Summary
 
 After all phases complete, provide:
