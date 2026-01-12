@@ -229,6 +229,12 @@ For each task with a Design Doc reference in its `## References` section:
 2. Locate that section in SDD.md
 3. Verify the implementation aligns with the design
 
+**If the referenced SDD section is not found:**
+- Log: "Warning: Task [TASK-ID] references 'Section X.Y' but this section was not found in SDD.md"
+- Mark this design alignment check as **N/A - Reference Not Found**
+- Continue validating other aspects
+- Note in final report: "Consider updating task references or SDD.md"
+
 **Design Alignment Checks:**
 - **API Contracts**: Do endpoints/methods match the design?
 - **Data Models**: Do types/interfaces match the design?
@@ -245,6 +251,7 @@ For each task with a Design Doc reference in its `## References` section:
 |------|-------------|--------|--------|-------|
 | TASK-001 | 5.3 | API Contracts | PASS/FAIL | [notes] |
 | TASK-002 | 7.1 | Data Models | PASS/FAIL | [notes] |
+| TASK-003 | 9.2 | N/A | N/A | Section not found in SDD.md |
 ...
 
 **Result:** X/Y design aspects verified
@@ -258,6 +265,12 @@ For each task with PRD references (e.g., `PRD: REQ-001, REQ-005`):
 2. Locate each requirement in PRD.md
 3. Verify the implementation satisfies the requirement's "shall" statement
 
+**If a referenced requirement is not found:**
+- Log: "Warning: Task [TASK-ID] references [REQ-XXX] but this requirement was not found in PRD.md"
+- Mark this requirement as **N/A - Reference Not Found** (not FAIL)
+- Continue validating other requirements that exist
+- Note in final report: "Consider updating task references or PRD.md"
+
 **Output Format:**
 
 ```markdown
@@ -267,6 +280,7 @@ For each task with PRD references (e.g., `PRD: REQ-001, REQ-005`):
 |-------------|-------------|-------------------|--------|----------|
 | REQ-001 | [brief description] | TASK-001, TASK-003 | PASS/FAIL | [evidence] |
 | REQ-005 | [brief description] | TASK-002 | PASS/FAIL | [evidence] |
+| REQ-009 | N/A | TASK-004 | N/A | Requirement not found in PRD.md |
 ...
 
 **Result:** X/Y requirements satisfied

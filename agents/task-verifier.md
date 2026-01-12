@@ -207,7 +207,11 @@ If a criterion cannot be verified (e.g., "User experience is smooth"), mark as C
 If some criteria pass but others fail, status is INCOMPLETE. List exactly what needs to be fixed.
 
 ### Test Infrastructure Missing
-If the project's test command fails because tests aren't set up, note this as BLOCKED with recommendation to set up testing first.
+If the project's test command fails because tests aren't set up:
+- Mark test-related criteria as **CANNOT_VERIFY** (not BLOCKED)
+- Add note: "Test infrastructure not configured. Consider setting up tests."
+- Continue verifying other criteria that don't require tests
+- The task-level status should still be VERIFIED if all other criteria pass, or INCOMPLETE if non-test criteria fail
 
 ## Output Format
 
