@@ -59,53 +59,59 @@ ls -la .shipspec/planning/[feature-dir]/TASKS.md 2>/dev/null || echo "TASKS.md N
 >
 > Run `/feature-planning` to complete the planning workflow and generate tasks."
 
-## Step 2: Load and Parse Tasks
+## Step 2: Load, Parse, and Validate Tasks
 
-Load the tasks document:
-@.shipspec/planning/[feature-dir]/TASKS.md
+Delegate to the `task-manager` agent with:
+- Feature name: [feature-dir]
+- Operation: `parse`
 
-Parse the document to extract:
-1. **All tasks** with their IDs (TASK-XXX), titles, and statuses
-2. **Status indicators**:
-   - `- [ ]` = Not started
-   - `- [~]` = In progress
-   - `- [x]` = Completed
-3. **Dependencies** from each task's `Depends on:` line
+**If error (TASKS.md not found or empty):**
+Show the error message from task-manager and stop.
 
-Build a task map:
-```
-TASK-001: status=[ ], depends_on=[], title="..."
-TASK-002: status=[ ], depends_on=[TASK-001], title="..."
-TASK-003: status=[x], depends_on=[], title="..."
-```
+**If successful:**
+Use the task map and statistics from the response.
+
+Next, validate the task structure by delegating to `task-manager` with:
+- Feature name: [feature-dir]
+- Operation: `validate`
+
+**If INVALID:**
+Show all issues from the validation result (circular dependencies, multiple in-progress, invalid references) and stop.
+
+**If VALID:**
+Continue to Step 3.
 
 ## Step 3: Determine Target Task
 
 **If task-id was provided in arguments:**
 
-1. Validate the task exists in TASKS.md
-   - If not found: "Error: Task '[task-id]' not found in TASKS.md. Available tasks: [list task IDs]"
+Delegate to the `task-manager` agent with:
+- Feature name: [feature-dir]
+- Operation: `get_task`
+- Task ID: [task-id]
 
-2. Check task status:
-   - If `[x]` (completed): "Task [task-id] is already completed. Choose a different task or omit the task-id to get the next available."
-   - If `[~]` (in-progress): Proceed to Step 4 (verify completion)
-   - If `[ ]` (not started): Check dependencies are satisfied
+**Based on the result:**
 
-3. Validate dependencies (for not-started tasks):
-   - If any dependency is not `[x]`:
-     > "Cannot start [task-id] - dependencies not satisfied:
-     > - [DEP-ID]: [status]
-     >
-     > Complete the dependencies first, or choose a different task."
+- **NOT_FOUND**: Show error with available task IDs and stop.
+- **ALREADY_COMPLETED**: "Task [task-id] is already completed. Choose a different task or omit the task-id to get the next available."
+- **DEPENDENCIES_NOT_MET**: Show blocking dependencies and stop.
+- **FOUND** with status `in_progress`: Proceed to Step 4 (verify completion)
+- **FOUND** with status `not_started`: The task is ready - skip to Step 6
 
 **If no task-id was provided:**
 Continue to Step 4 to check for in-progress tasks, then Step 5 to find the next available.
 
 ## Step 4: Check for In-Progress Task
 
-Search for any task marked with `[~]` (in progress).
+Delegate to the `task-manager` agent with:
+- Feature name: [feature-dir]
+- Operation: `find_in_progress`
 
-**If an in-progress task is found:**
+**If MULTIPLE:**
+The validation in Step 2 should have caught this, but if it occurs:
+Show the warning message from task-manager and **stop** - wait for user to resolve.
+
+**If SINGLE:**
 
 If task-id was specified and it's different from the in-progress task:
 > "Warning: Task [in-progress-id] is currently in progress.
@@ -124,6 +130,11 @@ Tell the user:
 > "Found in-progress task: **[TASK-ID]: [Title]**
 >
 > Let me verify if this task has been completed..."
+
+**Get full task prompt** by delegating to `task-manager` with:
+- Feature name: [feature-dir]
+- Operation: `get_task`
+- Task ID: [the in-progress task ID]
 
 Delegate to the `task-verifier` subagent with:
 - The full task prompt for the in-progress task
@@ -145,7 +156,7 @@ Delegate to the `task-verifier` subagent with:
   - Show the blocking reason
   - Ask user how they want to proceed
 
-**If no in-progress task found:**
+**If NONE:**
 Continue to Step 5.
 
 ## Step 4.5: Validate Planning Alignment (if references exist)
@@ -194,34 +205,19 @@ Check if the task has a `## References` section containing SDD or PRD references
 ## Step 5: Find Target Task
 
 **If task-id was provided and validated in Step 3:**
-Use that task as the target.
+Use that task as the target (already validated as ready). Skip to Step 6.
 
 **Otherwise, find the next available task:**
-Find the first task that meets ALL criteria:
-1. Status is `[ ]` (not started)
-2. All dependencies are `[x]` (completed)
 
-**Dependency resolution logic:**
-- Parse the `Depends on:` line from each task
-- A task is "ready" if it has no dependencies OR all listed dependencies are marked `[x]`
-- Skip tasks whose dependencies aren't satisfied
+Delegate to the `task-manager` agent with:
+- Feature name: [feature-dir]
+- Operation: `find_next`
 
-**If no task is ready:**
+**Based on the result:**
 
-Check if all tasks are done:
-```
-All [x]? → "Congratulations! All tasks for '[feature-dir]' are complete!"
-```
-
-Otherwise, show the blocking situation:
-> "No tasks are currently ready. The following tasks are blocked:
->
-> | Task | Blocked By |
-> |------|------------|
-> | TASK-003 | TASK-001, TASK-002 |
-> | TASK-004 | TASK-002 |
->
-> Complete the blocking tasks first, then run this command again."
+- **ALL_COMPLETE**: "Congratulations! All tasks for '[feature-dir]' are complete!"
+- **BLOCKED**: Show the blocked tasks table from task-manager and stop.
+- **FOUND**: Continue to Step 6 with the returned task.
 
 ## Step 6: Start Task
 
@@ -230,7 +226,10 @@ Once a target task is identified:
 1. **Update TASKS.md**: Change the task's status from `[ ]` to `[~]`
    - Find `### - [ ] TASK-XXX:` -> Replace with `### - [~] TASK-XXX:`
 
-2. **Extract the full task prompt**: Get all content from the task header until the next task header (or end of phase/document)
+2. **Get full task prompt** by delegating to `task-manager` with:
+   - Feature name: [feature-dir]
+   - Operation: `get_task`
+   - Task ID: [the target task ID]
 
 3. **Display to user**:
 
@@ -265,6 +264,8 @@ After displaying the task, show progress:
 
 ## Edge Cases
 
+**Note:** Structural validation issues (multiple in-progress tasks, circular dependencies, invalid references) are handled by `task-manager validate` in Step 2 before task operations begin.
+
 ### Missing Feature Directory
 If no feature directory is provided, show the error from Step 0 and stop.
 
@@ -275,23 +276,6 @@ If task-id doesn't match expected formats:
 > Expected formats:
 > - Numeric: `3` (will be converted to TASK-003)
 > - Full ID: `TASK-003`"
-
-### Multiple In-Progress Tasks
-If more than one task is marked `[~]`:
-> "Warning: Multiple tasks are marked as in-progress. This shouldn't happen.
->
-> In-progress tasks:
-> - [TASK-XXX]: [Title]
-> - [TASK-YYY]: [Title]
->
-> Please resolve this by marking all but one as either `[ ]` (not started) or `[x]` (completed), then run this command again."
-
-### Circular Dependencies
-If dependency resolution detects a cycle:
-> "Error: Circular dependency detected in tasks. Please review the dependency chain:
-> TASK-001 -> TASK-002 -> TASK-003 -> TASK-001
->
-> Fix the dependencies in TASKS.md and try again."
 
 ### Empty Dependencies Field
 If a task has `Depends on: None` or no dependencies section, treat it as having no dependencies (ready if status is `[ ]`).

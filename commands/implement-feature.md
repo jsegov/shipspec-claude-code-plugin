@@ -51,32 +51,26 @@ ls .shipspec/planning/$ARGUMENTS/SDD.md 2>/dev/null || echo "SDD.md NOT FOUND"
 >
 > Run `/feature-planning $ARGUMENTS` to generate them."
 
-## Step 2: Load and Parse Tasks
+## Step 2: Load, Parse, and Validate Tasks
 
-Load the tasks document:
-@.shipspec/planning/$ARGUMENTS/TASKS.md
+Delegate to the `task-manager` agent with:
+- Feature name: $ARGUMENTS
+- Operation: `parse`
 
-Parse the document to extract:
-1. **All tasks** with their IDs (TASK-XXX or T01, T02, etc.), titles, and statuses
-2. **Status indicators**:
-   - `- [ ]` = Not started
-   - `- [~]` = In progress
-   - `- [x]` = Completed
-3. **Dependencies** from each task's `Depends on:` or `Dependencies:` line
-4. **Total task count** for progress tracking
+**If error (TASKS.md not found or empty):**
+Show the error message from task-manager and stop.
 
-Build a task map:
-```
-TASK-001: status=[ ], depends_on=[], title="..."
-TASK-002: status=[ ], depends_on=[TASK-001], title="..."
-TASK-003: status=[x], depends_on=[], title="..."
-```
+**If successful:**
+Use the task map and statistics from the response.
 
-Calculate:
-- Total tasks
-- Completed tasks (status `[x]`)
-- Remaining tasks (status `[ ]` or `[~]`)
+Next, validate the task structure by delegating to `task-manager` with:
+- Feature name: $ARGUMENTS
+- Operation: `validate`
 
+**If INVALID:**
+Show all issues from the validation result (circular dependencies, multiple in-progress, invalid references) and stop.
+
+**If VALID:**
 Tell the user:
 > "## Feature: $ARGUMENTS
 >
@@ -86,12 +80,21 @@ Tell the user:
 
 ## Step 3: Check for In-Progress Task
 
-Before starting the loop, check if there's already a task marked `[~]`:
+Delegate to the `task-manager` agent with:
+- Feature name: $ARGUMENTS
+- Operation: `find_in_progress`
 
-**If an in-progress task is found:**
+**If MULTIPLE:**
+The validation in Step 2 should have caught this, but if it occurs:
+Show the warning message from task-manager and **stop** - wait for user to resolve.
+
+**If SINGLE:**
 1. Tell user: "Found in-progress task: **[TASK-ID]: [Title]**. Verifying if already complete..."
 
-2. **Extract the full task prompt**: Get all content from the task header until the next task header
+2. **Get full task prompt** by delegating to `task-manager` with:
+   - Feature name: $ARGUMENTS
+   - Operation: `get_task`
+   - Task ID: [the in-progress task ID]
 
 3. **Delegate to task-verifier agent** with:
    - The full task prompt including acceptance criteria
@@ -116,40 +119,36 @@ Before starting the loop, check if there's already a task marked `[~]`:
    - Mark as `[x]` when implementation is complete
    - Continue to Step 4 (main loop)
 
+**If NONE:**
+Continue to Step 4 (main loop).
+
 ## Step 4: Main Implementation Loop
 
 **LOOP** until all tasks are complete or user aborts:
 
 ### 4.1: Find Next Ready Task
 
-Find the first task that meets ALL criteria:
-1. Status is `[ ]` (not started)
-2. All dependencies are `[x]` (completed)
+Delegate to the `task-manager` agent with:
+- Feature name: $ARGUMENTS
+- Operation: `find_next`
 
-**Dependency resolution:**
-- Parse the `Depends on:` line from each task
-- A task is "ready" if it has no dependencies OR all listed dependencies are marked `[x]`
-- Skip tasks whose dependencies aren't satisfied
+### 4.2: Check Result and Completion Status
 
-### 4.2: Check Completion Status
-
-**If no task is ready AND tasks remain:**
-
-Check what's blocking:
+**If BLOCKED:**
+Show the blocked tasks table from task-manager:
 > "**Implementation Paused**
 >
-> No tasks are currently ready. Blocked tasks:
->
-> | Task | Blocked By |
-> |------|------------|
-> | TASK-003 | TASK-001, TASK-002 |
+> No tasks are currently ready. [Show blocked tasks from task-manager response]
 >
 > This may indicate a circular dependency or missing task. Please review TASKS.md."
 
 **Stop the loop** - ask user how to proceed.
 
-**If all tasks are complete:**
+**If ALL_COMPLETE:**
 Continue to Step 5 (Final Feature Review).
+
+**If FOUND:**
+Continue to Step 4.3 with the returned task.
 
 ### 4.3: Start Task Implementation
 
@@ -167,7 +166,10 @@ Once a ready task is found:
 >
 > ---"
 
-3. **Extract the full task prompt**: Get all content from the task header until the next task header
+3. **Get full task prompt** by delegating to `task-manager` with:
+   - Feature name: $ARGUMENTS
+   - Operation: `get_task`
+   - Task ID: [the ready task ID from step 4.1]
 
 4. **IMPLEMENT THE TASK**:
    - Read the task prompt carefully
@@ -413,26 +415,7 @@ Compile results from all three validation categories:
 
 ## Edge Cases
 
-### Multiple In-Progress Tasks
-If more than one task is marked `[~]`:
-> "Warning: Multiple tasks are marked as in-progress. This shouldn't happen.
->
-> In-progress tasks:
-> - [TASK-XXX]: [Title]
-> - [TASK-YYY]: [Title]
->
-> Please resolve this by marking all but one as either `[ ]` (not started) or `[x]` (completed), then run this command again."
-
-**Stop the loop** - wait for user to resolve.
-
-### Circular Dependencies
-If dependency resolution detects a cycle:
-> "Error: Circular dependency detected:
-> TASK-001 -> TASK-002 -> TASK-003 -> TASK-001
->
-> Fix the dependencies in TASKS.md before continuing."
-
-**Stop the loop.**
+**Note:** Structural validation issues (multiple in-progress tasks, circular dependencies, invalid references) are handled by `task-manager validate` in Step 2 before implementation begins.
 
 ### Task Without Clear Implementation
 If a task prompt is too vague to implement:
