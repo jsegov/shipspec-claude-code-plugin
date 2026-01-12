@@ -25,7 +25,7 @@ description: Use this agent to verify task completion by checking acceptance cri
 
 model: sonnet
 color: yellow
-tools: Read, Glob, Grep, Bash(git:*), Bash(find:*), Bash(ls:*), Bash(cat:*), Bash(head:*), Bash(wc:*), Bash(npm:*), Bash(yarn:*), Bash(pnpm:*), Bash(bun:*), Bash(cargo:*), Bash(make:*), Bash(pytest:*), Bash(go:*)
+tools: Read, Glob, Grep, Bash(git:*), Bash(find:*), Bash(ls:*), Bash(cat:*), Bash(head:*), Bash(wc:*), Bash(npm:*), Bash(yarn:*), Bash(pnpm:*), Bash(bun:*), Bash(cargo:*), Bash(make:*), Bash(pytest:*), Bash(go:*), Bash(mypy:*), Bash(ruff:*), Bash(flake8:*), Bash(golangci-lint:*)
 ---
 
 # Task Verifier

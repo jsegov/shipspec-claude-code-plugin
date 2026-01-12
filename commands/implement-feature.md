@@ -360,9 +360,15 @@ Compile results from all three validation categories:
 
 ### Multiple In-Progress Tasks
 If more than one task is marked `[~]`:
-> "Warning: Multiple tasks are marked as in-progress. Resolving...
+> "Warning: Multiple tasks are marked as in-progress. This shouldn't happen.
 >
-> Completing the first in-progress task, marking others as not started."
+> In-progress tasks:
+> - [TASK-XXX]: [Title]
+> - [TASK-YYY]: [Title]
+>
+> Please resolve this by marking all but one as either `[ ]` (not started) or `[x]` (completed), then run this command again."
+
+**Stop the loop** - wait for user to resolve.
 
 ### Circular Dependencies
 If dependency resolution detects a cycle:
