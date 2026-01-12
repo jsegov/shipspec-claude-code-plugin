@@ -132,10 +132,7 @@ Delegate to the `task-verifier` subagent with:
 **Based on verification result:**
 
 - **VERIFIED**:
-  - Update the task status from `[~]` to `[x]` in TASKS.md
-  - Tell user: "Task [TASK-ID] verified complete! Moving to next task..."
-  - If task-id was specified and matches: **Stop here** - the requested task is complete
-  - Otherwise: Continue to Step 5
+  - Continue to Step 4.5 to validate planning alignment (if task has references)
 
 - **INCOMPLETE**:
   - Keep the task as `[~]`
@@ -150,6 +147,49 @@ Delegate to the `task-verifier` subagent with:
 
 **If no in-progress task found:**
 Continue to Step 5.
+
+## Step 4.5: Validate Planning Alignment (if references exist)
+
+**This step runs after task-verifier returns VERIFIED.**
+
+Check if the task has a `## References` section containing SDD or PRD references.
+
+**If the task has SDD or PRD references:**
+
+1. Tell user: "Acceptance criteria verified. Checking planning alignment..."
+
+2. Delegate to the `planning-validator` agent with:
+   - The task ID
+   - The feature directory name
+   - The task's References section
+
+3. **Based on validation result:**
+
+   **If ALIGNED:**
+   - Tell user: "Planning alignment verified."
+   - Update task status from `[~]` to `[x]` in TASKS.md
+   - Tell user: "Task [TASK-ID] complete! Moving to next task..."
+   - If task-id was specified and matches: **Stop here** - the requested task is complete
+   - Otherwise: Continue to Step 5
+
+   **If MISALIGNED:**
+   - Show specific misalignment issues
+   - Tell user: "Implementation doesn't match design/requirements. Please fix the issues above."
+   - Keep task as `[~]`, **stop here**
+
+   **If UNVERIFIED:**
+   - Show missing references
+   - Tell user: "Warning: Some planning references could not be verified. Consider updating references in TASKS.md or planning documents."
+   - Update task status from `[~]` to `[x]` in TASKS.md (warning only, not blocking)
+   - Tell user: "Task [TASK-ID] complete with warnings. Moving to next task..."
+   - If task-id was specified and matches: **Stop here**
+   - Otherwise: Continue to Step 5
+
+**If the task has NO References section:**
+- Update task status from `[~]` to `[x]` in TASKS.md
+- Tell user: "Task [TASK-ID] verified complete! Moving to next task..."
+- If task-id was specified and matches: **Stop here**
+- Otherwise: Continue to Step 5
 
 ## Step 5: Find Target Task
 

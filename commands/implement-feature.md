@@ -89,20 +89,32 @@ Tell the user:
 Before starting the loop, check if there's already a task marked `[~]`:
 
 **If an in-progress task is found:**
-1. Tell user: "Found in-progress task: **[TASK-ID]: [Title]**. Resuming implementation..."
+1. Tell user: "Found in-progress task: **[TASK-ID]: [Title]**. Verifying if already complete..."
 
 2. **Extract the full task prompt**: Get all content from the task header until the next task header
 
-3. **IMPLEMENT THE TASK**:
-   - Read the task prompt carefully
-   - Identify files to create or modify
-   - Write the actual code following the implementation notes
-   - Run any specified build/test commands as you implement
-   - Follow the acceptance criteria to guide what needs to be done
+3. **Delegate to task-verifier agent** with:
+   - The full task prompt including acceptance criteria
+   - The feature name ($ARGUMENTS)
+   - The task ID
 
-4. Mark as `[x]` when implementation is complete
+4. **Based on verification result:**
 
-5. Continue to the main loop
+   **If VERIFIED:**
+   - Update task status from `[~]` to `[x]` in TASKS.md
+   - Tell user: "Task [TASK-ID] verified complete! Marking as done and continuing..."
+   - Continue to Step 4 (main loop)
+
+   **If INCOMPLETE or BLOCKED:**
+   - Tell user: "Task [TASK-ID] not yet complete. Continuing implementation..."
+   - **IMPLEMENT THE TASK**:
+     - Read the task prompt carefully
+     - Identify files to create or modify
+     - Write the actual code following the implementation notes
+     - Run any specified build/test commands as you implement
+     - Follow the acceptance criteria to guide what needs to be done
+   - Mark as `[x]` when implementation is complete
+   - Continue to Step 4 (main loop)
 
 ## Step 4: Main Implementation Loop
 
@@ -221,72 +233,51 @@ For each task in TASKS.md that is marked `[x]` (completed):
 
 If any task is INCOMPLETE, collect all failed criteria for the final report in Step 5.5.
 
-### 5.3: Validate Design Alignment
+### 5.3: Validate Planning Alignment (Design & Requirements)
 
-For each task with a Design Doc reference in its `## References` section:
+For each task in TASKS.md that is marked `[x]` (completed) AND has a `## References` section:
 
-1. Extract the section reference (e.g., "Section 5.3" or "Section 7.1")
-2. Locate that section in SDD.md
-3. Verify the implementation aligns with the design
+1. Delegate to the `planning-validator` agent with:
+   - The task ID
+   - The feature name ($ARGUMENTS)
+   - The task's References section (containing SDD sections and PRD requirements)
 
-**If the referenced SDD section is not found:**
-- Log: "Warning: Task [TASK-ID] references 'Section X.Y' but this section was not found in SDD.md"
-- Mark this design alignment check as **N/A - Reference Not Found**
-- Continue validating other aspects
-- Note in final report: "Consider updating task references or SDD.md"
+2. Record the validation result:
+   - **ALIGNED**: Implementation matches design and requirements
+   - **MISALIGNED**: Implementation doesn't match (collect specific issues)
+   - **UNVERIFIED**: References not found (track in `missing_references` list)
 
-**Design Alignment Checks:**
-- **API Contracts**: Do endpoints/methods match the design?
-- **Data Models**: Do types/interfaces match the design?
-- **Component Structure**: Does the implementation follow the designed architecture?
-- **Error Handling**: Is error handling implemented as designed?
-- **Security**: Are security measures from the design implemented?
+3. Aggregate results from all tasks
 
 **Output Format:**
 
 ```markdown
 ### 2. Design Alignment
 
-| Task | SDD Section | Aspect | Status | Notes |
-|------|-------------|--------|--------|-------|
-| TASK-001 | 5.3 | API Contracts | PASS/FAIL | [notes] |
-| TASK-002 | 7.1 | Data Models | PASS/FAIL | [notes] |
-| TASK-003 | 9.2 | N/A | N/A | Section not found in SDD.md |
+| Task | SDD Section | Status | Notes |
+|------|-------------|--------|-------|
+| TASK-001 | 5.3 | PASS/FAIL/UNVERIFIED | [notes from planning-validator] |
+| TASK-002 | 7.1 | PASS/FAIL/UNVERIFIED | [notes from planning-validator] |
 ...
 
 **Result:** X/Y design aspects verified
 ```
 
-### 5.4: Validate Requirements Coverage
-
-For each task with PRD references (e.g., `PRD: REQ-001, REQ-005`):
-
-1. Extract all REQ-XXX references
-2. Locate each requirement in PRD.md
-3. Verify the implementation satisfies the requirement's "shall" statement
-
-**If a referenced requirement is not found:**
-- Log: "Warning: Task [TASK-ID] references [REQ-XXX] but this requirement was not found in PRD.md"
-- Mark this requirement as **N/A - Reference Not Found** (not FAIL)
-- Continue validating other requirements that exist
-- Note in final report: "Consider updating task references or PRD.md"
-
-**Output Format:**
-
 ```markdown
 ### 3. Requirements Coverage
 
-| Requirement | Description | Implementing Tasks | Status | Evidence |
-|-------------|-------------|-------------------|--------|----------|
-| REQ-001 | [brief description] | TASK-001, TASK-003 | PASS/FAIL | [evidence] |
-| REQ-005 | [brief description] | TASK-002 | PASS/FAIL | [evidence] |
-| REQ-009 | N/A | TASK-004 | N/A | Requirement not found in PRD.md |
+| Requirement | Implementing Tasks | Status | Evidence |
+|-------------|-------------------|--------|----------|
+| REQ-001 | TASK-001, TASK-003 | PASS/FAIL/UNVERIFIED | [evidence from planning-validator] |
+| REQ-005 | TASK-002 | PASS/FAIL/UNVERIFIED | [evidence from planning-validator] |
 ...
 
 **Result:** X/Y requirements satisfied
 ```
 
-### 5.5: Generate Final Verdict
+**Note:** Tasks without a References section are skipped for planning validation (they still go through acceptance criteria validation in 5.2).
+
+### 5.4: Generate Final Verdict
 
 Compile results from all three validation categories:
 
@@ -310,10 +301,15 @@ Compile results from all three validation categories:
 
 **Determine overall verdict:**
 
-**APPROVED** (all validations pass):
+**APPROVED** (all validations pass, no warnings):
 - All acceptance criteria PASSED (CANNOT_VERIFY is acceptable)
-- Design alignment verified or N/A for all tasks
-- All requirements satisfied or N/A
+- Design alignment verified for all tasks (no UNVERIFIED)
+- All requirements satisfied (no UNVERIFIED)
+
+**APPROVED WITH WARNINGS** (passes but has unverified references):
+- All acceptance criteria PASSED (CANNOT_VERIFY is acceptable)
+- Some design alignment or requirements are UNVERIFIED due to missing references
+- No explicit FAILs
 
 **NEEDS WORK** (any validation fails):
 - One or more acceptance criteria FAILED
@@ -325,7 +321,7 @@ Compile results from all three validation categories:
 - AND no explicit FAILED criteria exist (otherwise it's NEEDS WORK)
 - Examples: missing test infrastructure, cannot run type checker, missing acceptance criteria
 
-### 5.6: Take Action Based on Verdict
+### 5.5: Take Action Based on Verdict
 
 **If APPROVED:**
 
@@ -343,6 +339,35 @@ Compile results from all three validation categories:
 > - Review the changes: `git diff`
 > - Commit your changes: `git add . && git commit -m "Implement $ARGUMENTS feature"`
 > - Create a pull request if needed"
+
+**If APPROVED WITH WARNINGS:**
+
+> "## APPROVED WITH WARNINGS
+>
+> Feature **$ARGUMENTS** has been implemented and core validations passed, but some references could not be verified.
+>
+> **Summary:**
+> - Tasks Completed: X/X
+> - Acceptance Criteria: X passed
+> - Design Alignment: X verified, Y unverified
+> - Requirements: X/X satisfied, Y unverified
+>
+> **Unverified References:**
+>
+> | Source | Reference | Task | Issue |
+> |--------|-----------|------|-------|
+> | SDD | Section X.Y | TASK-XXX | Section not found in SDD.md |
+> | PRD | REQ-XXX | TASK-YYY | Requirement not found in PRD.md |
+>
+> **Action Required:**
+> Please manually verify these references are either:
+> 1. No longer relevant (safe to ignore)
+> 2. Need to be updated in TASKS.md, PRD.md, or SDD.md
+>
+> **Next Steps:**
+> - Review the unverified references above
+> - If satisfied, proceed with: `git add . && git commit -m "Implement $ARGUMENTS feature"`
+> - If references need fixing, update the planning artifacts and re-run `/implement-feature $ARGUMENTS`"
 
 **If NEEDS WORK:**
 
