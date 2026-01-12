@@ -1,21 +1,25 @@
 # ShipSpec Claude Code Plugin
 
-**Ship bigger features with confidence.**
+**Spec-driven development for big features.**
 
-Vibe coding works great for small tasks, but it breaks down as features get bigger. Claude's native plan mode helps, but plans stay in the conversation—they're too vague for multi-session work, leading to context loss, contradictions, and hallucinations.
+Claude Code's native plan mode works great—for small features. But when a feature gets big, the plan gets vague. There's just too much to capture, so you end up with high-level bullet points instead of real structure. And vague plans lead to hallucinations during implementation.
 
-ShipSpec fixes this with **spec-driven development**: persistent PRDs, technical designs, and implementation tasks that keep your AI coding agent on track across sessions.
+Claude loses sight of *why* it's building what it's building. It makes architecture decisions that contradict what you discussed. It "finishes" tasks that don't actually meet the requirements. The plan is there, but it's too shallow to keep a complex implementation on track.
+
+**The problem isn't Claude—it's that big features need more than a plan. They need a spec.**
+
+ShipSpec replaces vague plans with structured PRDs, technical designs, and ordered tasks that keep Claude grounded throughout implementation.
 
 ## Why ShipSpec?
 
 | Problem | Solution |
 |---------|----------|
-| Plans disappear when context resets | Persistent docs in `.shipspec/planning/` |
-| Vague requirements cause hallucinations | Detailed PRD with numbered requirements |
-| Architecture decisions get forgotten | SDD captures design choices |
-| Large features feel chaotic | Tasks with acceptance criteria and verification |
+| Big features make plans too vague | Structured PRD with numbered requirements |
+| Claude drifts from original intent | Requirements stay visible, linked to every task |
+| Architecture decisions get contradicted | SDD documents design choices before implementation |
+| Implementation feels chaotic | Ordered tasks with acceptance criteria and verification |
 
-**The result**: Spend more time planning upfront, ship with fewer rewrites.
+**The result**: Claude always knows *why* it's building something (requirements) and *how* to build it (design), working through manageable chunks that build on each other.
 
 ## Features
 
