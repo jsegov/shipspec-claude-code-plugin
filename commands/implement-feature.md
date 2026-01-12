@@ -1,12 +1,12 @@
 ---
 description: Implement all tasks for a feature end-to-end automatically
 argument-hint: <feature-name>
-allowed-tools: Read, Glob, Grep, Write, Edit, Bash(cat:*), Bash(ls:*), Bash(find:*), Bash(npm:*), Bash(git:*), Bash(head:*), Bash(wc:*), Bash(npx:*), Task, AskUserQuestion
+allowed-tools: Read, Glob, Grep, Write, Edit, Bash(cat:*), Bash(ls:*), Bash(find:*), Bash(git:*), Bash(head:*), Bash(wc:*), Bash(npm:*), Bash(npx:*), Bash(yarn:*), Bash(pnpm:*), Bash(bun:*), Bash(cargo:*), Bash(make:*), Bash(pytest:*), Bash(go:*), Bash(mypy:*), Bash(ruff:*), Task, AskUserQuestion
 ---
 
 # Implement Feature: $ARGUMENTS
 
-Automatically implement ALL tasks in a feature's TASKS.md file end-to-end. For each task: implement the code, verify completion, and continue to the next task.
+Automatically implement ALL tasks in a feature's TASKS.md file end-to-end. After all tasks are complete, run a comprehensive review against PRD, SDD, and all acceptance criteria.
 
 ## Step 0: Validate Argument
 
@@ -37,15 +37,19 @@ ls -d .shipspec/planning/$ARGUMENTS 2>/dev/null || echo "NOT_FOUND"
 >
 > Please run `/feature-planning $ARGUMENTS` first to create the planning artifacts."
 
-**Check for TASKS.md:**
+**Check for required planning artifacts:**
 ```bash
-ls -la .shipspec/planning/$ARGUMENTS/TASKS.md 2>/dev/null || echo "TASKS.md NOT FOUND"
+echo "=== Checking planning artifacts ==="
+ls .shipspec/planning/$ARGUMENTS/TASKS.md 2>/dev/null || echo "TASKS.md NOT FOUND"
+ls .shipspec/planning/$ARGUMENTS/PRD.md 2>/dev/null || echo "PRD.md NOT FOUND"
+ls .shipspec/planning/$ARGUMENTS/SDD.md 2>/dev/null || echo "SDD.md NOT FOUND"
 ```
 
-**If TASKS.md not found:**
-> "No TASKS.md found in `.shipspec/planning/$ARGUMENTS/`.
+**If any artifact missing:**
+> "Missing required planning artifacts for '$ARGUMENTS':
+> - [List missing files]
 >
-> Run `/feature-planning $ARGUMENTS` to complete the planning workflow and generate tasks."
+> Run `/feature-planning $ARGUMENTS` to generate them."
 
 ## Step 2: Load and Parse Tasks
 
@@ -85,11 +89,10 @@ Tell the user:
 Before starting the loop, check if there's already a task marked `[~]`:
 
 **If an in-progress task is found:**
-1. Tell user: "Found in-progress task: **[TASK-ID]: [Title]**. Verifying completion..."
-2. Delegate to `task-verifier` subagent with the full task prompt
-3. Handle verification result (see Step 6 below)
-4. If VERIFIED, mark as `[x]` and continue to the main loop
-5. If INCOMPLETE, attempt to fix (retry once) before asking user
+1. Tell user: "Found in-progress task: **[TASK-ID]: [Title]**. Resuming implementation..."
+2. Continue implementing from where it left off
+3. Mark as `[x]` when implementation is complete
+4. Continue to the main loop
 
 ## Step 4: Main Implementation Loop
 
@@ -124,15 +127,7 @@ Check what's blocking:
 **Stop the loop** - ask user how to proceed.
 
 **If all tasks are complete:**
-
-> "## All Tasks Complete!
->
-> **Feature:** $ARGUMENTS
-> **Tasks Completed:** X/X
->
-> All tasks have been implemented and verified. Run `/review-diff $ARGUMENTS` to review the changes against the design documents."
-
-**End the loop successfully.**
+Continue to Step 5 (Final Feature Review).
 
 ### 4.3: Start Task Implementation
 
@@ -159,99 +154,207 @@ Once a ready task is found:
    - Run any specified build/test commands as you implement
    - Follow the acceptance criteria to guide what needs to be done
 
-## Step 5: Verify Task Completion
+5. **Mark task complete**: After implementation, update TASKS.md from `[~]` to `[x]`
 
-After implementing, delegate to the `task-verifier` subagent:
-- Pass the full task prompt with acceptance criteria
-- Pass the feature name: `$ARGUMENTS`
-- Pass the task ID being verified
-
-## Step 6: Handle Verification Result
-
-**IF VERIFIED:**
-1. Update TASKS.md: Change status from `[~]` to `[x]`
-2. Tell user:
-> "**[TASK-ID]: VERIFIED**
->
-> Task complete. Moving to next task..."
-3. **Continue to next iteration of the loop**
-
-**IF INCOMPLETE (First attempt):**
-1. Review what's missing from the verification report
-2. Attempt to fix the issues
-3. Re-run verification (delegate to task-verifier again)
-4. If now VERIFIED -> proceed as above
-5. If still INCOMPLETE -> proceed to "Second attempt" below
-
-**IF INCOMPLETE (Second attempt / retry failed):**
-1. Keep task as `[~]`
-2. Show the user what failed:
-> "**[TASK-ID]: Verification Failed**
->
-> After retry, the following issues remain:
-> - [Issue 1]
-> - [Issue 2]
->
-> **Options:**
-> 1. I can try a different approach to fix these issues
-> 2. You can fix manually, then run `/implement-feature $ARGUMENTS` to continue
-> 3. Skip this task and continue with others
-> 4. Abort the implementation loop"
-
-**Wait for user response**, then:
-- Option 1: Attempt another fix approach
-- Option 2: Stop the loop (user will fix and re-run)
-- Option 3: Mark task with a note and continue to next ready task
-- Option 4: Stop the loop entirely
-
-**IF BLOCKED:**
-1. Show the blocking reason
-2. Ask user how to proceed:
-> "**[TASK-ID]: Blocked**
->
-> Cannot verify due to: [blocking reason]
->
-> **Options:**
-> 1. Skip this task and continue
-> 2. Abort the implementation loop
-> 3. I'll try to resolve the blocking issue first"
-
-## Step 7: Progress Summary (After Each Task)
-
-After successfully completing each task, show cumulative progress:
-
+6. **Show progress**:
 > "**Progress: [X/TOTAL]**
 >
 > | Status | Count |
 > |--------|-------|
 > | Completed | X |
-> | In Progress | 0-1 |
 > | Remaining | Y |
 >
 > *Continuing to next task...*"
 
-Then return to Step 4.1 to find the next task.
+7. Return to Step 4.1 to find the next task.
 
-## Step 8: Final Summary
+---
 
-When the loop ends (either all complete or aborted):
+## Step 5: Final Feature Review
 
-> "## Implementation Summary: $ARGUMENTS
+After all tasks are marked complete, perform a comprehensive review of the entire feature implementation.
+
+> "## All Tasks Implemented!
 >
-> | Status | Tasks |
-> |--------|-------|
-> | Completed | X tasks |
-> | Skipped | Y tasks |
-> | Failed | Z tasks |
-> | Remaining | W tasks |
+> Running comprehensive feature review against PRD, SDD, and all acceptance criteria..."
+
+### 5.1: Load Planning Artifacts
+
+Load the PRD and SDD for reference:
+@.shipspec/planning/$ARGUMENTS/PRD.md
+@.shipspec/planning/$ARGUMENTS/SDD.md
+
+### 5.2: Validate All Acceptance Criteria
+
+For each task in TASKS.md, locate and verify its `## Acceptance Criteria` section.
+
+**Criterion Categories and Verification Methods:**
+
+| Criterion Pattern | Verification Method |
+|-------------------|---------------------|
+| "File X exists" or "Create file X" | Use `ls -la path/to/file` or Glob |
+| "Tests pass" | Run project's test command (detect from package.json, Makefile, etc.) |
+| "No type errors" | Run project's type checker if applicable |
+| "Linting passes" | Run project's lint command if configured |
+| "Function X implemented" | Grep for function definition, Read the file |
+| "API endpoint works" | Check route file exists, handler implemented |
+| "Component renders" | Check component file exists with proper exports |
+| "Database migration" | Check migration file in migrations folder |
+| "Documentation updated" | Check relevant docs for content |
+
+**Detecting Project Commands:**
+- Check `package.json` for `scripts.test`, `scripts.lint`, `scripts.typecheck`
+- Check `Makefile` for `test`, `lint`, `check` targets
+- Check `pyproject.toml` for pytest, ruff, mypy configuration
+- Check `Cargo.toml` for Rust projects (use `cargo test`, `cargo clippy`)
+- Check for common config files: `.eslintrc`, `tsconfig.json`, `setup.py`, etc.
+
+For each criterion across all tasks:
+1. Determine the appropriate verification method
+2. Execute the verification
+3. Record: PASS, FAIL, or CANNOT_VERIFY
+
+**Output Format:**
+
+```markdown
+### 1. Acceptance Criteria Validation
+
+| Task | Criterion | Status | Evidence |
+|------|-----------|--------|----------|
+| TASK-001 | [criterion text] | PASS/FAIL | [brief evidence] |
+| TASK-001 | [criterion text] | PASS/FAIL | [brief evidence] |
+| TASK-002 | [criterion text] | PASS/FAIL | [brief evidence] |
+...
+
+**Result:** X passed, Y failed, Z could not verify
+```
+
+### 5.3: Validate Design Alignment
+
+For each task with a Design Doc reference in its `## References` section:
+
+1. Extract the section reference (e.g., "Section 5.3" or "Section 7.1")
+2. Locate that section in SDD.md
+3. Verify the implementation aligns with the design
+
+**Design Alignment Checks:**
+- **API Contracts**: Do endpoints/methods match the design?
+- **Data Models**: Do types/interfaces match the design?
+- **Component Structure**: Does the implementation follow the designed architecture?
+- **Error Handling**: Is error handling implemented as designed?
+- **Security**: Are security measures from the design implemented?
+
+**Output Format:**
+
+```markdown
+### 2. Design Alignment
+
+| Task | SDD Section | Aspect | Status | Notes |
+|------|-------------|--------|--------|-------|
+| TASK-001 | 5.3 | API Contracts | PASS/FAIL | [notes] |
+| TASK-002 | 7.1 | Data Models | PASS/FAIL | [notes] |
+...
+
+**Result:** X/Y design aspects verified
+```
+
+### 5.4: Validate Requirements Coverage
+
+For each task with PRD references (e.g., `PRD: REQ-001, REQ-005`):
+
+1. Extract all REQ-XXX references
+2. Locate each requirement in PRD.md
+3. Verify the implementation satisfies the requirement's "shall" statement
+
+**Output Format:**
+
+```markdown
+### 3. Requirements Coverage
+
+| Requirement | Description | Implementing Tasks | Status | Evidence |
+|-------------|-------------|-------------------|--------|----------|
+| REQ-001 | [brief description] | TASK-001, TASK-003 | PASS/FAIL | [evidence] |
+| REQ-005 | [brief description] | TASK-002 | PASS/FAIL | [evidence] |
+...
+
+**Result:** X/Y requirements satisfied
+```
+
+### 5.5: Generate Final Verdict
+
+Compile results from all three validation categories:
+
+```markdown
+## Feature Review Summary: $ARGUMENTS
+
+### Implementation Results
+- Total Tasks: X
+- Tasks Completed: X
+
+### Validation Results
+
+| Category | Result | Details |
+|----------|--------|---------|
+| Acceptance Criteria | X/Y passed | [brief summary] |
+| Design Alignment | X/Y verified | [brief summary] |
+| Requirements Coverage | X/Y satisfied | [brief summary] |
+
+### Overall Verdict
+```
+
+**Determine overall verdict:**
+
+**APPROVED** (all validations pass):
+- All acceptance criteria PASSED (CANNOT_VERIFY is acceptable)
+- Design alignment verified or N/A for all tasks
+- All requirements satisfied or N/A
+
+**NEEDS WORK** (any validation fails):
+- One or more acceptance criteria FAILED
+- OR design alignment FAILED (implementation doesn't match design)
+- OR requirements FAILED (implementation doesn't satisfy requirements)
+
+### 5.6: Take Action Based on Verdict
+
+**If APPROVED:**
+
+> "## APPROVED
 >
-> **Completed Tasks:**
-> - [x] TASK-001: [Title]
-> - [x] TASK-002: [Title]
+> All validations passed! Feature **$ARGUMENTS** has been fully implemented and verified.
+>
+> **Summary:**
+> - Tasks Completed: X/X
+> - Acceptance Criteria: X passed
+> - Design Alignment: Verified
+> - Requirements: X/X satisfied
 >
 > **Next Steps:**
-> - Run `/review-diff $ARGUMENTS` to review changes against design
-> - Commit your changes when ready"
+> - Review the changes: `git diff`
+> - Commit your changes: `git add . && git commit -m "Implement $ARGUMENTS feature"`
+> - Create a pull request if needed"
+
+**If NEEDS WORK:**
+
+> "## NEEDS WORK
+>
+> Feature implementation is complete, but some validations failed.
+>
+> ### Issues to Fix
+>
+> **Acceptance Criteria:**
+> - [List failed criteria with specific fixes needed]
+>
+> **Design Alignment:**
+> - [List misalignments with references to SDD sections]
+>
+> **Requirements:**
+> - [List unsatisfied requirements with what's missing]
+>
+> ---
+>
+> After fixing these issues, run `/implement-feature $ARGUMENTS` again to re-validate."
+
+---
 
 ## Edge Cases
 
@@ -259,9 +362,7 @@ When the loop ends (either all complete or aborted):
 If more than one task is marked `[~]`:
 > "Warning: Multiple tasks are marked as in-progress. Resolving...
 >
-> Verifying each in-progress task before continuing."
-
-Verify each one with task-verifier. Mark verified ones as `[x]`, keep first incomplete one as `[~]`.
+> Completing the first in-progress task, marking others as not started."
 
 ### Circular Dependencies
 If dependency resolution detects a cycle:
@@ -283,18 +384,32 @@ If a task prompt is too vague to implement:
 > 3. Stop so you can clarify the task in TASKS.md"
 
 ### Build/Test Failures During Implementation
-If running build or tests fails during implementation (not verification):
+If running build or tests fails during implementation:
 > "Build/test failed while implementing [TASK-ID]:
 > [error output]
 >
 > Attempting to fix..."
 
-Try to fix the issue. If unable to fix after reasonable attempts, proceed to verification (which will likely fail and trigger the retry logic).
+Try to fix the issue. If unable to fix after reasonable attempts, ask user how to proceed.
+
+### Tests Not Configured
+If the project's test command fails because tests aren't set up:
+- Note as CANNOT_VERIFY for test-related criteria
+- Add suggestion: "Test infrastructure not found. Consider setting up tests."
+- Do not fail the entire review for this
+
+### Type Checker / Linter Not Available
+If the project doesn't have a type checker or linter configured:
+- Note as CANNOT_VERIFY for type/lint criteria
+- Continue with other validations
+
+---
 
 ## Important Notes
 
 1. **Save progress frequently**: Update TASKS.md after each task completion so progress survives interruptions
-2. **Be thorough**: Implement each task fully before moving to verification
+2. **Be thorough**: Implement each task fully before marking complete
 3. **Read context**: Use PRD.md and SDD.md in the feature directory for additional context
 4. **Follow patterns**: Look at existing code in the codebase for consistent patterns
 5. **Run tests**: If the project has tests, run them as part of implementation
+6. **Final review matters**: The comprehensive review at the end validates the entire feature against the spec

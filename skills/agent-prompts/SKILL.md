@@ -59,8 +59,8 @@ interface ExpectedOutput {
 - [ ] [Criterion 1 - must be verifiable]
 - [ ] [Criterion 2 - must be verifiable]
 - [ ] All tests pass
-- [ ] No TypeScript errors
-- [ ] Linting passes
+- [ ] No type errors (if applicable)
+- [ ] Linting passes (if configured)
 
 ## Dependencies
 - Depends on: [TASK-XXX] (must complete first)
@@ -69,7 +69,7 @@ interface ExpectedOutput {
 ## References
 - Design Doc: Section X.Y
 - PRD: REQ-XXX, REQ-YYY
-- Similar implementation: `path/to/similar/code.ts`
+- Similar implementation: `path/to/similar/code`
 
 ## Estimated Effort
 - Story Points: [1/2/3/5/8]
