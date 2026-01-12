@@ -2,6 +2,8 @@
 # hooks/task-loop-hook.sh
 # Stop hook for automatic task verification retry loop
 
+set -euo pipefail
+
 STATE_FILE=".claude/shipspec-task-loop.local.md"
 
 # Exit early if no active loop - BEFORE consuming stdin
@@ -14,54 +16,113 @@ fi
 INPUT=$(cat)
 TRANSCRIPT_PATH=$(echo "$INPUT" | jq -r '.transcript_path // empty')
 
-# Parse YAML frontmatter
-ITERATION=$(grep "^iteration:" "$STATE_FILE" | sed 's/iteration: //')
-MAX_ITERATIONS=$(grep "^max_iterations:" "$STATE_FILE" | sed 's/max_iterations: //')
-FEATURE=$(grep "^feature:" "$STATE_FILE" | sed 's/feature: //')
-TASK_ID=$(grep "^task_id:" "$STATE_FILE" | sed 's/task_id: //')
+# Parse YAML frontmatter only (not prompt body)
+FRONTMATTER=$(sed -n '/^---$/,/^---$/{ /^---$/d; p; }' "$STATE_FILE")
+
+# Extract fields from frontmatter
+ITERATION=$(echo "$FRONTMATTER" | grep '^iteration:' | sed 's/iteration: *//' || echo "")
+MAX_ITERATIONS=$(echo "$FRONTMATTER" | grep '^max_iterations:' | sed 's/max_iterations: *//' || echo "")
+FEATURE=$(echo "$FRONTMATTER" | grep '^feature:' | sed 's/feature: *//' || echo "")
+TASK_ID=$(echo "$FRONTMATTER" | grep '^task_id:' | sed 's/task_id: *//' || echo "")
+
+# Extract prompt (everything after the closing ---)
+PROMPT_TEXT=$(awk '/^---$/{i++; next} i>=2' "$STATE_FILE")
 
 # Validate numeric fields
-if [[ ! "$ITERATION" =~ ^[0-9]+$ ]] || [[ ! "$MAX_ITERATIONS" =~ ^[0-9]+$ ]]; then
-  echo "⚠️ Corrupted state file, cleaning up" >&2
+if [[ ! "$ITERATION" =~ ^[0-9]+$ ]]; then
+  echo "⚠️ Task loop: State file corrupted" >&2
+  echo "   File: $STATE_FILE" >&2
+  echo "   Problem: 'iteration' field is not a valid number (got: '$ITERATION')" >&2
+  echo "   Run /cancel-task-loop or delete the file manually" >&2
   rm -f "$STATE_FILE"
   exit 0
 fi
 
-# Check for completion marker in last assistant message (like ralph does)
-if [[ -n "$TRANSCRIPT_PATH" ]] && [[ -f "$TRANSCRIPT_PATH" ]]; then
-  LAST_ASSISTANT=$(grep '"role":"assistant"' "$TRANSCRIPT_PATH" | tail -1)
-  LAST_OUTPUT=$(echo "$LAST_ASSISTANT" | jq -r '
-    .message.content |
-    map(select(.type == "text")) |
-    map(.text) |
-    join("\n")
-  ' 2>/dev/null)
-
-  # Check for completion marker
-  if echo "$LAST_OUTPUT" | grep -q '<task-loop-complete>VERIFIED</task-loop-complete>'; then
-    rm -f "$STATE_FILE"
-    exit 0  # Allow exit - task verified
-  fi
-
-  if echo "$LAST_OUTPUT" | grep -q '<task-loop-complete>BLOCKED</task-loop-complete>'; then
-    rm -f "$STATE_FILE"
-    exit 0  # Allow exit - task blocked, needs manual intervention
-  fi
-
-  if echo "$LAST_OUTPUT" | grep -q '<task-loop-complete>INCOMPLETE</task-loop-complete>'; then
-    rm -f "$STATE_FILE"
-    exit 0  # Allow exit - task incomplete, needs manual fixes
-  fi
-
-  if echo "$LAST_OUTPUT" | grep -q '<task-loop-complete>MISALIGNED</task-loop-complete>'; then
-    rm -f "$STATE_FILE"
-    exit 0  # Allow exit - implementation misaligned with planning
-  fi
+if [[ ! "$MAX_ITERATIONS" =~ ^[0-9]+$ ]]; then
+  echo "⚠️ Task loop: State file corrupted" >&2
+  echo "   File: $STATE_FILE" >&2
+  echo "   Problem: 'max_iterations' field is not a valid number (got: '$MAX_ITERATIONS')" >&2
+  echo "   Run /cancel-task-loop or delete the file manually" >&2
+  rm -f "$STATE_FILE"
+  exit 0
 fi
 
-# Max iterations check
-if [[ $ITERATION -ge $MAX_ITERATIONS ]]; then
-  echo "⚠️ Max iterations ($MAX_ITERATIONS) reached for $TASK_ID" >&2
+# Validate prompt text exists
+if [[ -z "$PROMPT_TEXT" ]]; then
+  echo "⚠️ Task loop: State file corrupted or incomplete" >&2
+  echo "   File: $STATE_FILE" >&2
+  echo "   Problem: No prompt text found after frontmatter" >&2
+  echo "" >&2
+  echo "   This usually means:" >&2
+  echo "     - State file was manually edited" >&2
+  echo "     - File was corrupted during writing" >&2
+  echo "" >&2
+  echo "   Run /cancel-task-loop or delete the file manually" >&2
+  rm -f "$STATE_FILE"
+  exit 0
+fi
+
+# Validate transcript exists and has content
+if [[ -z "$TRANSCRIPT_PATH" ]] || [[ ! -f "$TRANSCRIPT_PATH" ]]; then
+  echo "⚠️ Task loop: Transcript not found, allowing exit" >&2
+  rm -f "$STATE_FILE"
+  exit 0
+fi
+
+# Check for assistant messages
+if ! grep -q '"role":"assistant"' "$TRANSCRIPT_PATH" 2>/dev/null; then
+  echo "⚠️ Task loop: No assistant messages in transcript, allowing exit" >&2
+  rm -f "$STATE_FILE"
+  exit 0
+fi
+
+# Extract last assistant message
+LAST_LINE=$(grep '"role":"assistant"' "$TRANSCRIPT_PATH" | tail -1)
+if [[ -z "$LAST_LINE" ]]; then
+  echo "⚠️ Task loop: Failed to extract last assistant message" >&2
+  rm -f "$STATE_FILE"
+  exit 0
+fi
+
+# Parse with error handling
+LAST_OUTPUT=$(echo "$LAST_LINE" | jq -r '
+  .message.content |
+  map(select(.type == "text")) |
+  map(.text) |
+  join("\n")
+' 2>&1) || true
+
+if [[ -z "$LAST_OUTPUT" ]]; then
+  echo "⚠️ Task loop: Assistant message contained no text" >&2
+  rm -f "$STATE_FILE"
+  exit 0
+fi
+
+# Check for completion markers
+if echo "$LAST_OUTPUT" | grep -q '<task-loop-complete>VERIFIED</task-loop-complete>'; then
+  rm -f "$STATE_FILE"
+  exit 0  # Allow exit - task verified
+fi
+
+if echo "$LAST_OUTPUT" | grep -q '<task-loop-complete>BLOCKED</task-loop-complete>'; then
+  rm -f "$STATE_FILE"
+  exit 0  # Allow exit - task blocked, needs manual intervention
+fi
+
+if echo "$LAST_OUTPUT" | grep -q '<task-loop-complete>INCOMPLETE</task-loop-complete>'; then
+  rm -f "$STATE_FILE"
+  exit 0  # Allow exit - task incomplete, needs manual fixes
+fi
+
+if echo "$LAST_OUTPUT" | grep -q '<task-loop-complete>MISALIGNED</task-loop-complete>'; then
+  rm -f "$STATE_FILE"
+  exit 0  # Allow exit - implementation misaligned with planning
+fi
+
+# Max iterations check (0 means unlimited)
+if [[ $MAX_ITERATIONS -gt 0 ]] && [[ $ITERATION -ge $MAX_ITERATIONS ]]; then
+  echo "⚠️ Task loop: Max iterations ($MAX_ITERATIONS) reached for $TASK_ID" >&2
+  echo "   Run /cancel-task-loop to clear state if needed" >&2
   rm -f "$STATE_FILE"
   exit 0
 fi
@@ -73,7 +134,12 @@ sed "s/^iteration: .*/iteration: $NEXT_ITERATION/" "$STATE_FILE" > "$TEMP_FILE"
 mv "$TEMP_FILE" "$STATE_FILE"
 
 # Build system message
-SYSTEM_MSG="🔄 **Task Loop: Attempt $NEXT_ITERATION/$MAX_ITERATIONS**
+MAX_DISPLAY="$MAX_ITERATIONS"
+if [[ "$MAX_ITERATIONS" == "0" ]]; then
+  MAX_DISPLAY="unlimited"
+fi
+
+SYSTEM_MSG="🔄 **Task Loop: Attempt $NEXT_ITERATION/$MAX_DISPLAY**
 
 Previous attempt did not pass all acceptance criteria.
 
@@ -82,9 +148,9 @@ Previous attempt did not pass all acceptance criteria.
 
 Review what failed and continue implementation. When done, run task-verifier to check completion."
 
-# Return block decision - feed prompt back for another attempt
+# Return block decision - feed original prompt back for another attempt
 jq -n \
-  --arg prompt "Continue implementing $TASK_ID. Fix any issues, then verify the task is complete." \
+  --arg prompt "$PROMPT_TEXT" \
   --arg msg "$SYSTEM_MSG" \
   '{
     "decision": "block",
