@@ -1,23 +1,38 @@
 # ShipSpec Claude Code Plugin
 
-**Spec-driven development for Claude Code.** Plan features systematically before writing code—transform ideas into well-structured PRDs, technical designs, and implementation tasks.
+**Spec-driven development for big features.**
 
-Spec-driven development ensures you think through requirements and architecture before implementation, resulting in better code, fewer rewrites, and clearer communication.
+Claude Code's native plan mode works great—for small features. But when a feature gets big, the plan gets vague. There's just too much to capture, so you end up with high-level bullet points instead of real structure. And vague plans lead to hallucinations during implementation.
+
+Claude loses sight of *why* it's building what it's building. It makes architecture decisions that contradict what you discussed. It "finishes" tasks that don't actually meet the requirements. The plan is there, but it's too shallow to keep a complex implementation on track.
+
+**The problem isn't Claude—it's that big features need more than a plan. They need a spec.**
+
+ShipSpec replaces vague plans with structured PRDs, technical designs, and ordered tasks that keep Claude grounded throughout implementation.
+
+## Why ShipSpec?
+
+| Problem | Solution |
+|---------|----------|
+| Big features make plans too vague | Structured PRD with numbered requirements |
+| Claude drifts from original intent | Requirements stay visible, linked to every task |
+| Architecture decisions get contradicted | SDD documents design choices before implementation |
+| Implementation feels chaotic | Ordered tasks with acceptance criteria and verification |
+
+**The result**: Claude always knows *why* it's building something (requirements) and *how* to build it (design), working through manageable chunks that build on each other.
 
 ## Features
 
-- **Conversational PRD Gathering**: Structured interview process to extract clear requirements
+- **Conversational PRD Gathering**: Structured interview to extract clear requirements
 - **Codebase-Aware Design**: Technical designs grounded in your existing architecture
 - **Agent-Ready Tasks**: Implementation tasks with detailed prompts for coding agents
-- **Progressive Workflow**: Each phase builds on the previous
+- **Built-in Verification**: Each task is verified against acceptance criteria before moving on
 
 ## Installation
 
-### From Local Directory
-
 ```bash
-/plugin marketplace add shipspec/planning-plugin
-/plugin install shipspec@shipspec
+/plugin marketplace add jsegov/shipspec-marketplace
+/plugin install shipspec@shipspec-marketplace
 ```
 
 ## Usage
@@ -25,50 +40,51 @@ Spec-driven development ensures you think through requirements and architecture 
 ### Quick Start
 
 ```bash
-# Start planning a new feature (runs full workflow)
-/feature-planning my-feature
+# Start planning a new feature with a description (or run interactively)
+/feature-planning "Add user authentication with OAuth2 and session management"
+/feature-planning                  # prompts for description interactively
 
-# Implement tasks one by one
-/implement-next-task my-feature
-
-# Review implementation against planning artifacts
-/review-diff my-feature
+# Implement tasks one by one (or specify a task ID)
+/implement-task user-auth-oauth2
+/implement-task user-auth-oauth2 3  # implement specific task
 ```
 
 ### Full Feature Planning Workflow
 
-Run `/feature-planning <name>` to go through the complete planning workflow:
+Run `/feature-planning` with a description to go through the complete planning workflow:
 
 ```
-/feature-planning user-authentication
+/feature-planning "Add user authentication with OAuth2 and session management"
 ```
 
-The command guides you through 6 phases:
+The command auto-generates a directory name (e.g., `user-auth-oauth2`) and guides you through 7 phases:
 
-1. **Setup** - Creates `.shipspec/planning/user-authentication/` and extracts codebase context
+1. **Feature Description** - Gather or confirm the feature description, auto-generate directory name
 
-2. **Requirements Gathering** - Interactive Q&A with the PRD Gatherer agent about:
+2. **Setup** - Creates `.shipspec/planning/<generated-name>/` and extracts codebase context
+
+3. **Requirements Gathering** - Interactive Q&A with the PRD Gatherer agent about:
    - The problem you're solving
    - Target users
    - Must-have vs nice-to-have features
    - Technical constraints
 
-3. **PRD Generation** - Creates structured PRD with numbered requirements
+4. **PRD Generation** - Creates structured PRD with numbered requirements
    - *Pauses for your review and approval*
 
-4. **Technical Decisions** - Interactive Q&A about:
+5. **Technical Decisions** - Interactive Q&A about:
    - Infrastructure preferences (databases, caching, queues)
    - Framework and library choices
    - Deployment and scaling considerations
 
-5. **SDD Generation** - Creates technical design document with:
+6. **SDD Generation** - Creates technical design document with:
    - Architecture decisions
    - API specifications
    - Data models
    - Component designs
    - *Pauses for your review and approval*
 
-6. **Task Generation** - Automatically creates implementation tasks with:
+7. **Task Generation** - Automatically creates implementation tasks with:
    - Story point estimates
    - Dependencies
    - Detailed agent prompts
@@ -91,9 +107,9 @@ Note: A temporary `context.md` file is created during planning but automatically
 
 | Command | Description |
 |---------|-------------|
-| `/feature-planning <name>` | Run complete planning workflow (requirements → PRD → SDD → tasks) |
-| `/implement-next-task <name>` | Start/continue implementing tasks from TASKS.md |
-| `/review-diff <name>` | Review implementation against planning artifacts (TASKS.md, SDD.md, PRD.md) |
+| `/feature-planning [description]` | Run complete planning workflow - provide description inline or interactively |
+| `/implement-task <feature-dir> [task-id]` | Implement a specific task or the next available task from TASKS.md |
+| `/implement-feature <feature-dir>` | Automatically implement all tasks end-to-end with final review |
 
 ## Agents
 
@@ -102,7 +118,7 @@ Note: A temporary `context.md` file is created during planning but automatically
 | `prd-gatherer` | Requirements elicitation | Planning features, writing specs |
 | `design-architect` | Technical design | Architecture decisions, API design |
 | `task-planner` | Task decomposition | Breaking down features |
-| `task-verifier` | Verify task completion | Running /implement-next-task |
+| `task-verifier` | Verify task completion | Running /implement-task or /implement-feature |
 
 ## Skills
 
@@ -144,35 +160,41 @@ Tasks larger than 8 points are automatically broken down.
 
 After planning is complete, use this workflow to implement tasks:
 
+### Manual Task-by-Task
 ```
-/implement-next-task my-feature    # Start a task (marks it [~])
+/implement-task my-feature         # Start next available task (marks it [~])
         ↓
    Implement the task              # Write the code
         ↓
-/review-diff my-feature            # Validate against PRD, SDD, acceptance criteria
+/implement-task my-feature         # Verify and move to next task
         ↓
    ┌────┴────┐
    │ Passed? │
    └────┬────┘
-   Yes: Task marked [x], suggests next task
-   No:  Shows issues to fix, re-run /review-diff after fixing
+   Yes: Task marked [x], shows next task
+   No:  Shows issues to fix, re-run after fixing
 ```
 
-The `/review-diff` command validates three things:
-1. **Acceptance Criteria** - All criteria from the task in TASKS.md are met
-2. **Design Alignment** - Implementation follows the referenced SDD section
-3. **Requirements Coverage** - Referenced PRD requirements are satisfied
+### Automatic Full Feature
+```
+/implement-feature my-feature      # Implement ALL tasks automatically
+```
+
+The `/implement-feature` command implements all tasks and runs a comprehensive final review that validates:
+1. **Acceptance Criteria** - All criteria from every task are met
+2. **Design Alignment** - Implementation follows SDD sections
+3. **Requirements Coverage** - All PRD requirements are satisfied
 
 ## Tips
 
 - **Use `/feature-planning` for full workflow**: Single command runs requirements → PRD → SDD → tasks
 - **Review at each gate**: The workflow pauses after PRD and SDD for your review
-- **Use `/implement-next-task` to work through tasks**: Tracks progress and verifies completion
-- **Use `/review-diff` after implementing**: Validates work against planning artifacts before marking complete
+- **Use `/implement-task` to work through tasks manually**: Tracks progress and verifies completion
+- **Use `/implement-feature` for automation**: Implements all tasks and runs comprehensive final review
 
-## Contributing
+## Issues & Feedback
 
-Contributions welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+Found a bug or have a suggestion? [Submit an issue](https://github.com/jsegov/shipspec-claude-code-plugin/issues)
 
 ## License
 

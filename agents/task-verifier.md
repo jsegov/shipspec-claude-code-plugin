@@ -25,7 +25,7 @@ description: Use this agent to verify task completion by checking acceptance cri
 
 model: sonnet
 color: yellow
-tools: Read, Glob, Grep, Bash(npm:*), Bash(git:*), Bash(find:*), Bash(ls:*), Bash(cat:*), Bash(head:*), Bash(wc:*)
+tools: Read, Glob, Grep, Bash(git:*), Bash(find:*), Bash(ls:*), Bash(cat:*), Bash(head:*), Bash(wc:*), Bash(npm:*), Bash(yarn:*), Bash(pnpm:*), Bash(bun:*), Bash(cargo:*), Bash(make:*), Bash(pytest:*), Bash(go:*), Bash(mypy:*), Bash(ruff:*), Bash(flake8:*), Bash(golangci-lint:*)
 ---
 
 # Task Verifier
@@ -49,6 +49,12 @@ You will receive:
 
 Parse the task prompt to find the `## Acceptance Criteria` section. Each line starting with `- [ ]` or `- [x]` is a criterion to verify.
 
+**If no Acceptance Criteria section is found OR the section has no criteria items:**
+- Set status to **BLOCKED**
+- Report: "No acceptance criteria found in task prompt. A task without acceptance criteria cannot be auto-verified."
+- Recommendation: "Add an `## Acceptance Criteria` section to the task in TASKS.md with specific, testable criteria."
+- **Stop here** - do not proceed to Step 2
+
 ### Step 2: Categorize Each Criterion
 
 For each criterion, determine the verification method:
@@ -56,14 +62,23 @@ For each criterion, determine the verification method:
 | Criterion Pattern | Verification Method |
 |-------------------|---------------------|
 | "File X exists" or "Create file X" | `ls -la path/to/file` or Glob for the file |
-| "Tests pass" | Run `npm test` or project's test command |
-| "No TypeScript errors" | Run `npm run typecheck` or `npx tsc --noEmit` |
-| "Linting passes" | Run `npm run lint` or project's lint command |
+| "Tests pass" | Run project's test command (detect from config files) |
+| "No type errors" | Run project's type checker if applicable |
+| "Linting passes" | Run project's lint command if configured |
 | "Function X implemented" | Grep for function definition, Read the file |
 | "API endpoint works" | Check route file exists, handler implemented |
 | "Component renders" | Check component file exists with proper exports |
 | "Database migration" | Check migration file exists in migrations folder |
 | "Documentation updated" | Check README or docs for relevant content |
+
+**Detecting Project Commands:**
+First, identify the project type and available commands:
+- **Node.js**: Check `package.json` for `scripts.test`, `scripts.lint`, `scripts.typecheck`
+- **Python**: Check for `pytest.ini`, `pyproject.toml`, `setup.py`; use `pytest`, `mypy`, `ruff`/`flake8`
+- **Rust**: Use `cargo test`, `cargo clippy`
+- **Go**: Use `go test`, `golangci-lint`
+- **Make-based**: Check `Makefile` for `test`, `lint`, `check` targets
+- **Bun**: Check `bun.lockb` and use `bun test`
 
 ### Step 3: Execute Verifications
 
@@ -89,17 +104,17 @@ Output a structured report:
 
 | # | Criterion | Status | Evidence |
 |---|-----------|--------|----------|
-| 1 | File exists at src/api/users.ts | PASS | File found, 45 lines |
+| 1 | File exists at src/api/users | PASS | File found, 45 lines |
 | 2 | Tests pass | PASS | 12 tests passing |
-| 3 | No TypeScript errors | FAIL | 2 type errors found |
+| 3 | No type errors | FAIL | 2 type errors found |
 | 4 | Documentation updated | CANNOT_VERIFY | No docs folder found |
 
 ### Issues Found
 
-#### Issue 1: TypeScript Errors
+#### Issue 1: Type Errors
 ```
-src/api/users.ts:23 - Type 'string' is not assignable to type 'number'
-src/api/users.ts:45 - Property 'email' does not exist on type 'User'
+src/api/users:23 - Type error: incompatible types
+src/api/users:45 - Property 'email' does not exist on type 'User'
 ```
 
 ### Recommendation
@@ -125,23 +140,52 @@ grep -n "export const functionName" src/**/*.ts
 Then Read the file to verify implementation quality.
 
 ### For Tests
+First detect the project type, then run appropriate command:
 ```bash
-# Run all tests
+# Node.js (npm/yarn/pnpm/bun)
 npm test 2>&1 | tail -50
+yarn test 2>&1 | tail -50
+bun test 2>&1 | tail -50
 
-# Or run specific test file
-npm test -- path/to/specific.test.ts 2>&1
+# Python
+pytest 2>&1 | tail -50
+
+# Rust
+cargo test 2>&1 | tail -50
+
+# Go
+go test ./... 2>&1 | tail -50
+
+# Make-based
+make test 2>&1 | tail -50
 ```
 
-### For TypeScript
+### For Type Checking
 ```bash
-# Check for type errors
+# TypeScript
 npx tsc --noEmit 2>&1 | head -30
+
+# Python (mypy)
+mypy . 2>&1 | head -30
+
+# Rust (built into cargo check)
+cargo check 2>&1 | head -30
 ```
 
 ### For Linting
 ```bash
+# Node.js
 npm run lint 2>&1 | head -30
+
+# Python
+ruff check . 2>&1 | head -30
+flake8 . 2>&1 | head -30
+
+# Rust
+cargo clippy 2>&1 | head -30
+
+# Go
+golangci-lint run 2>&1 | head -30
 ```
 
 ### For Git Changes
@@ -163,7 +207,11 @@ If a criterion cannot be verified (e.g., "User experience is smooth"), mark as C
 If some criteria pass but others fail, status is INCOMPLETE. List exactly what needs to be fixed.
 
 ### Test Infrastructure Missing
-If `npm test` fails because tests aren't set up, note this as BLOCKED with recommendation to set up testing first.
+If the project's test command fails because tests aren't set up:
+- Mark test-related criteria as **CANNOT_VERIFY** (not BLOCKED)
+- Add note: "Test infrastructure not configured. Consider setting up tests."
+- Continue verifying other criteria that don't require tests
+- The task-level status should still be VERIFIED if all other criteria pass, or INCOMPLETE if non-test criteria fail
 
 ## Output Format
 

@@ -1,31 +1,99 @@
 ---
 description: Start planning a new feature with AI-assisted PRD generation
-argument-hint: <feature-name>
+argument-hint: [feature-description]
 allowed-tools: Read, Glob, Grep, Write, Bash(git status), Bash(git log:*), Bash(find:*), Bash(ls:*), Bash(cat:*), Bash(head:*), Bash(mkdir:*), Bash(rm:*), Task, AskUserQuestion
 ---
 
-# Feature Planning: $ARGUMENTS
+# Feature Planning
 
 Guide the user through the complete feature planning workflow from requirements gathering to implementation tasks.
 
 ## Workflow Overview
 
-This command runs through 6 phases:
-1. **Setup** - Create planning directory and extract codebase context
-2. **Requirements Gathering** - Interactive Q&A with prd-gatherer agent
-3. **PRD Generation** - Generate PRD and pause for user review
-4. **Technical Decisions** - Interactive Q&A with design-architect agent
-5. **SDD Generation** - Generate SDD and pause for user review
-6. **Task Generation** - Automatically generate implementation tasks
+This command runs through 7 phases:
+1. **Feature Description** - Gather or confirm the feature description
+2. **Setup** - Create planning directory and extract codebase context
+3. **Requirements Gathering** - Interactive Q&A with prd-gatherer agent
+4. **PRD Generation** - Generate PRD and pause for user review
+5. **Technical Decisions** - Interactive Q&A with design-architect agent
+6. **SDD Generation** - Generate SDD and pause for user review
+7. **Task Generation** - Automatically generate implementation tasks
 
 ---
 
-## Phase 1/6: Setup
+## Phase 1/7: Feature Description
 
-Create the planning directory structure:
+**Goal:** Gather a detailed description of the feature to guide all downstream work.
+
+### If description provided as argument ($ARGUMENTS is not empty):
+
+Use the provided argument as the feature description:
+> "Got it! Planning feature: **$ARGUMENTS**"
+
+Store this description for use in later phases.
+
+### If no argument provided ($ARGUMENTS is empty):
+
+Prompt the user for a detailed feature description using AskUserQuestion:
+
+> "Let's start planning a new feature! Please describe what you want to build."
+
+- **Header**: "Feature Description"
+- **Question**: "Describe the feature you want to build. Include what problem it solves, key functionality, and any important constraints. The more detail you provide, the better the planning will be."
+- **Options**:
+  - **Quick example**: "A user authentication system with OAuth2 support"
+  - **Detailed example**: "An e-commerce checkout flow with payment processing, cart management, shipping options, and order confirmation emails"
+
+The user can also type their own description in the free text field.
+
+**Store the description** for use throughout all phases.
+
+---
+
+## Phase 2/7: Setup
+
+### Generate Directory Name
+
+From the feature description, extract key concepts and generate a directory name:
+
+1. Identify 2-4 key words/concepts from the description
+2. Convert to kebab-case
+3. Keep it concise (max 30 characters)
+
+**Examples:**
+- "Add user authentication with OAuth2 and session management" → `user-auth-oauth2`
+- "Build a notification system for email and push alerts" → `notification-system`
+- "Create API endpoints for product inventory management" → `product-inventory-api`
+
+### Confirm Directory Name
+
+Use AskUserQuestion to confirm or override the generated name:
+
+> "I'll create the planning directory for this feature."
+
+- **Header**: "Directory Name"
+- **Question**: "I've generated the directory name `[generated-name]` based on your description. Would you like to use this name or provide a different one?"
+- **Options**:
+  - **Use generated name**: "Use `[generated-name]`"
+  - **Enter custom name**: "I'll type a different name"
+
+If user selects custom name, use the value they type in the free text field.
+
+Store the final directory name as `FEATURE_DIR`.
+
+### Create Planning Directory
 
 ```bash
-mkdir -p .shipspec/planning/$ARGUMENTS
+mkdir -p .shipspec/planning/[FEATURE_DIR]
+```
+
+### Save Feature Description
+
+Save the feature description to the planning directory for reference:
+
+```bash
+# Write description to a file for context
+echo "[FEATURE_DESCRIPTION]" > .shipspec/planning/[FEATURE_DIR]/description.txt
 ```
 
 ### Extract Codebase Context
@@ -37,41 +105,56 @@ Analyze the current codebase to understand:
 3. **Patterns** - What conventions are followed?
 4. **Documentation** - What guidance exists?
 
+**Focus the codebase analysis based on the feature description:**
+- If description mentions "API", focus on API-related files and patterns
+- If description mentions "UI" or "component", focus on frontend patterns
+- If description mentions "database", focus on data models and migrations
+
 Use the codebase-context skill for this analysis. Save findings to:
-`.shipspec/planning/$ARGUMENTS/context.md`
+`.shipspec/planning/[FEATURE_DIR]/context.md`
 
 ---
 
-## Phase 2/6: Requirements Gathering
+## Phase 3/7: Requirements Gathering
 
 Delegate to the `prd-gatherer` subagent to have a focused conversation about requirements.
 
+**Pass the feature description to the agent as initial context:**
+
 Begin with:
-> "**Phase 2/6: Requirements Gathering**
+> "**Phase 3/7: Requirements Gathering**
 >
-> I'll now gather requirements for the $ARGUMENTS feature. Let me ask you some questions to understand what we're building."
+> **Feature:** [FEATURE_DESCRIPTION]
+>
+> I'll now gather detailed requirements for this feature. Let me ask you some questions to understand what we're building."
 
 The subagent will:
+- Use the feature description to focus its questions
 - Ask clarifying questions about the problem
 - Explore the codebase for context
 - Help define clear, testable requirements
 - Identify what's out of scope
 
-When the user indicates requirements are complete, proceed to Phase 3.
+When the user indicates requirements are complete, proceed to Phase 4.
 
 ---
 
-## Phase 3/6: Generate PRD
+## Phase 4/7: Generate PRD
 
 Load the context file:
 ```bash
-cat .shipspec/planning/$ARGUMENTS/context.md 2>/dev/null || echo "No context file found"
+cat .shipspec/planning/[FEATURE_DIR]/context.md 2>/dev/null || echo "No context file found"
+```
+
+Load the feature description:
+```bash
+cat .shipspec/planning/[FEATURE_DIR]/description.txt 2>/dev/null || echo "No description file"
 ```
 
 Using the prd-template skill, create a comprehensive PRD with:
 
 1. **Overview**
-   - Problem statement
+   - Problem statement (derived from feature description)
    - Proposed solution
    - Target users
    - Success metrics
@@ -94,26 +177,26 @@ Using the prd-template skill, create a comprehensive PRD with:
 
 6. **Open Questions**
 
-Save the PRD to: `.shipspec/planning/$ARGUMENTS/PRD.md`
+Save the PRD to: `.shipspec/planning/[FEATURE_DIR]/PRD.md`
 
 ### Review Gate
 
 After generating, use the AskUserQuestion tool to get approval:
 
 - **Header**: "PRD Review"
-- **Question**: "PRD generated and saved to `.shipspec/planning/$ARGUMENTS/PRD.md`. Please review the document. Would you like to approve it or request changes?"
+- **Question**: "PRD generated and saved to `.shipspec/planning/[FEATURE_DIR]/PRD.md`. Please review the document. Would you like to approve it or request changes?"
 - **Options**:
   - **Approve**: "Continue to technical design phase"
   - **Request changes**: "I'll describe changes needed"
 
 **WAIT for user response before proceeding.**
 
-- If **"Approve"** selected: Continue to Phase 4.
+- If **"Approve"** selected: Continue to Phase 5.
 - If **"Request changes"** selected: Ask user to describe the changes, update the PRD, then ask for review again.
 
 ---
 
-## Phase 4/6: Technical Decisions Gathering
+## Phase 5/7: Technical Decisions Gathering
 
 Once the PRD is approved, begin gathering technical decisions.
 
@@ -126,23 +209,27 @@ Delegate to the `design-architect` subagent to:
 - Ask about deployment and scaling considerations
 - Propose architecture aligned with existing patterns
 
-Begin with:
-> "**Phase 4/6: Technical Decisions**
->
-> Now I need to understand the technical approach for $ARGUMENTS. Let me ask about infrastructure, frameworks, and architectural decisions."
+**Pass the feature description as context:**
 
-When the user indicates technical decisions are complete, proceed to Phase 5.
+Begin with:
+> "**Phase 5/7: Technical Decisions**
+>
+> **Feature:** [FEATURE_DESCRIPTION]
+>
+> Now I need to understand the technical approach. Let me ask about infrastructure, frameworks, and architectural decisions."
+
+When the user indicates technical decisions are complete, proceed to Phase 6.
 
 ---
 
-## Phase 5/6: Generate SDD
+## Phase 6/7: Generate SDD
 
 Load the PRD:
-@.shipspec/planning/$ARGUMENTS/PRD.md
+@.shipspec/planning/[FEATURE_DIR]/PRD.md
 
 Load context:
 ```bash
-cat .shipspec/planning/$ARGUMENTS/context.md 2>/dev/null || echo "No context file"
+cat .shipspec/planning/[FEATURE_DIR]/context.md 2>/dev/null || echo "No context file"
 ```
 
 Using the sdd-template skill, create a comprehensive design document with all 8 sections:
@@ -158,7 +245,7 @@ Using the sdd-template skill, create a comprehensive design document with all 8 
 
 Ensure every requirement from the PRD is addressed with traceability.
 
-Save the SDD to: `.shipspec/planning/$ARGUMENTS/SDD.md`
+Save the SDD to: `.shipspec/planning/[FEATURE_DIR]/SDD.md`
 
 ### Review Gate
 
@@ -170,29 +257,29 @@ After generating, summarize the key design decisions and use the AskUserQuestion
 > - [Decision 3]
 
 - **Header**: "SDD Review"
-- **Question**: "SDD generated and saved to `.shipspec/planning/$ARGUMENTS/SDD.md`. Please review the technical design. Would you like to approve it or request changes?"
+- **Question**: "SDD generated and saved to `.shipspec/planning/[FEATURE_DIR]/SDD.md`. Please review the technical design. Would you like to approve it or request changes?"
 - **Options**:
   - **Approve**: "Continue to generate implementation tasks"
   - **Request changes**: "I'll describe changes needed"
 
 **WAIT for user response before proceeding.**
 
-- If **"Approve"** selected: Continue to Phase 6.
+- If **"Approve"** selected: Continue to Phase 7.
 - If **"Request changes"** selected: Ask user to describe the changes, update the SDD, then ask for review again.
 
 ---
 
-## Phase 6/6: Generate Tasks
+## Phase 7/7: Generate Tasks
 
 Once the SDD is approved, automatically generate implementation tasks.
 
 Load the planning documents:
-@.shipspec/planning/$ARGUMENTS/PRD.md
-@.shipspec/planning/$ARGUMENTS/SDD.md
+@.shipspec/planning/[FEATURE_DIR]/PRD.md
+@.shipspec/planning/[FEATURE_DIR]/SDD.md
 
 Load context:
 ```bash
-cat .shipspec/planning/$ARGUMENTS/context.md 2>/dev/null || echo "No context file"
+cat .shipspec/planning/[FEATURE_DIR]/context.md 2>/dev/null || echo "No context file"
 ```
 
 Delegate to the `task-planner` subagent to:
@@ -221,17 +308,18 @@ Using the agent-prompts skill, create a comprehensive task list with:
    - Dependencies clearly marked
    - Acceptance criteria
 
-Save the tasks to: `.shipspec/planning/$ARGUMENTS/TASKS.md`
+Save the tasks to: `.shipspec/planning/[FEATURE_DIR]/TASKS.md`
 
 ### Cleanup Temporary Files
 
-After tasks are generated successfully, clean up the temporary context file:
+After tasks are generated successfully, clean up the temporary files:
 
 ```bash
-rm -f .shipspec/planning/$ARGUMENTS/context.md
+rm -f .shipspec/planning/[FEATURE_DIR]/context.md
+rm -f .shipspec/planning/[FEATURE_DIR]/description.txt
 ```
 
-The context information is now incorporated into the PRD, SDD, and TASKS.md files.
+The context and description are now incorporated into the PRD, SDD, and TASKS.md files.
 
 ---
 
@@ -239,7 +327,9 @@ The context information is now incorporated into the PRD, SDD, and TASKS.md file
 
 After all phases complete, provide:
 
-> "**Planning Complete for $ARGUMENTS!**
+> "**Planning Complete for [FEATURE_DIR]!**
+>
+> **Feature:** [FEATURE_DESCRIPTION]
 >
 > **Summary:**
 > - Total Tasks: [X]
@@ -248,12 +338,13 @@ After all phases complete, provide:
 > - Critical Path: [list]
 >
 > **Generated Documents:**
-> - `.shipspec/planning/$ARGUMENTS/PRD.md` - Product requirements
-> - `.shipspec/planning/$ARGUMENTS/SDD.md` - Technical design
-> - `.shipspec/planning/$ARGUMENTS/TASKS.md` - Implementation tasks
+> - `.shipspec/planning/[FEATURE_DIR]/PRD.md` - Product requirements
+> - `.shipspec/planning/[FEATURE_DIR]/SDD.md` - Technical design
+> - `.shipspec/planning/[FEATURE_DIR]/TASKS.md` - Implementation tasks
 >
 > **Next Steps:**
-> Run `/implement-next-task` to start implementing the first task.
+> Run `/implement-task [FEATURE_DIR]` to start implementing the first task.
+> Run `/implement-feature [FEATURE_DIR]` to implement all tasks automatically.
 > Each task includes a detailed prompt you can give directly to Claude Code."
 
 ---
