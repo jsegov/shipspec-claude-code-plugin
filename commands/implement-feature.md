@@ -1,7 +1,7 @@
 ---
 description: Implement all tasks for a feature end-to-end automatically
 argument-hint: <feature-name>
-allowed-tools: Read, Glob, Grep, Write, Edit, Bash(cat:*), Bash(ls:*), Bash(find:*), Bash(git:*), Bash(head:*), Bash(wc:*), Bash(npm:*), Bash(npx:*), Bash(yarn:*), Bash(pnpm:*), Bash(bun:*), Bash(cargo:*), Bash(make:*), Bash(pytest:*), Bash(go:*), Bash(mypy:*), Bash(ruff:*), Task, AskUserQuestion
+allowed-tools: Read, Glob, Grep, Write, Edit, Bash(cat:*), Bash(ls:*), Bash(find:*), Bash(git:*), Bash(head:*), Bash(wc:*), Bash(npm:*), Bash(npx:*), Bash(yarn:*), Bash(pnpm:*), Bash(bun:*), Bash(cargo:*), Bash(make:*), Bash(pytest:*), Bash(go:*), Bash(mypy:*), Bash(ruff:*), Bash(flake8:*), Bash(golangci-lint:*), Task, AskUserQuestion
 ---
 
 # Implement Feature: $ARGUMENTS
@@ -186,48 +186,30 @@ Load the PRD and SDD for reference:
 
 ### 5.2: Validate All Acceptance Criteria
 
-For each task in TASKS.md, locate and verify its `## Acceptance Criteria` section.
+For each task in TASKS.md that is marked `[x]` (completed):
 
-**Criterion Categories and Verification Methods:**
+1. Extract the full task prompt (from task header to next task header)
+2. Delegate to the `task-verifier` agent with:
+   - The full task prompt including acceptance criteria
+   - The feature name ($ARGUMENTS)
+   - The task ID
+3. Record the verification result (VERIFIED, INCOMPLETE, or BLOCKED)
 
-| Criterion Pattern | Verification Method |
-|-------------------|---------------------|
-| "File X exists" or "Create file X" | Use `ls -la path/to/file` or Glob |
-| "Tests pass" | Run project's test command (detect from package.json, Makefile, etc.) |
-| "No type errors" | Run project's type checker if applicable |
-| "Linting passes" | Run project's lint command if configured |
-| "Function X implemented" | Grep for function definition, Read the file |
-| "API endpoint works" | Check route file exists, handler implemented |
-| "Component renders" | Check component file exists with proper exports |
-| "Database migration" | Check migration file in migrations folder |
-| "Documentation updated" | Check relevant docs for content |
-
-**Detecting Project Commands:**
-- Check `package.json` for `scripts.test`, `scripts.lint`, `scripts.typecheck`
-- Check `Makefile` for `test`, `lint`, `check` targets
-- Check `pyproject.toml` for pytest, ruff, mypy configuration
-- Check `Cargo.toml` for Rust projects (use `cargo test`, `cargo clippy`)
-- Check for common config files: `.eslintrc`, `tsconfig.json`, `setup.py`, etc.
-
-For each criterion across all tasks:
-1. Determine the appropriate verification method
-2. Execute the verification
-3. Record: PASS, FAIL, or CANNOT_VERIFY
-
-**Output Format:**
+**Aggregate results into a summary:**
 
 ```markdown
 ### 1. Acceptance Criteria Validation
 
-| Task | Criterion | Status | Evidence |
-|------|-----------|--------|----------|
-| TASK-001 | [criterion text] | PASS/FAIL | [brief evidence] |
-| TASK-001 | [criterion text] | PASS/FAIL | [brief evidence] |
-| TASK-002 | [criterion text] | PASS/FAIL | [brief evidence] |
-...
+| Task | Status | Details |
+|------|--------|---------|
+| TASK-001 | VERIFIED | All criteria passed |
+| TASK-002 | INCOMPLETE | 2 criteria failed: [brief list] |
+| TASK-003 | VERIFIED | All criteria passed |
 
-**Result:** X passed, Y failed, Z could not verify
+**Result:** X verified, Y incomplete, Z blocked
 ```
+
+If any task is INCOMPLETE, collect all failed criteria for the final report in Step 5.5.
 
 ### 5.3: Validate Design Alignment
 
