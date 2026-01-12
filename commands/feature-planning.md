@@ -361,7 +361,7 @@ Use AskUserQuestion with options:
 Create state file:
 ```bash
 mkdir -p .claude
-cat > .claude/shipspec-planning-refine.local.md << 'EOF'
+cat > .claude/shipspec-planning-refine.local.md << EOF
 ---
 active: true
 feature: [FEATURE_DIR]
@@ -372,6 +372,21 @@ large_tasks:
   - TASK-007
 tasks_refined: 0
 ---
+
+## Task Refinement for [FEATURE_DIR]
+
+Continue refining large tasks in \`.shipspec/planning/[FEATURE_DIR]/TASKS.md\`.
+
+### Instructions:
+1. Read TASKS.md and identify tasks with story points > 5
+2. For each large task, break it into 2-3 smaller subtasks (each ≤3 story points)
+3. Update TASKS.md with the new subtasks
+4. Preserve acceptance criteria across subtasks
+5. Update dependencies pointing to the original task
+
+### Completion:
+When all tasks are ≤5 story points, output:
+\`<planning-refine-complete>\`
 EOF
 ```
 
