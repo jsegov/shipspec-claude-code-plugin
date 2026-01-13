@@ -177,6 +177,16 @@ Show the warning message from task-manager and **stop** - wait for user to resol
      - DO NOT output completion marker (stop hook will trigger retry)
      - Show what failed to user
 
+   - **If BLOCKED after implementation:**
+     - **Clean up state file:**
+       ```bash
+       rm -f .shipspec/planning/$ARGUMENTS/feature-retry.local.json .shipspec/active-loop.local.json
+       ```
+     - **Output blocked marker:**
+       `<feature-task-complete>BLOCKED</feature-task-complete>`
+     - Tell user: "Task [TASK-ID] is blocked: [reason]. Manual intervention required."
+     - Ask user how to proceed (skip task, abort feature, or manual fix)
+
    **If BLOCKED:**
    - **Clean up any existing feature retry state:**
      ```bash
