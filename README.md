@@ -1,25 +1,50 @@
 # ShipSpec Claude Code Plugin
 
-**Spec-driven development for big features.**
+**Spec-driven development meets the Ralph Wiggum loop.**
 
-Claude Code's native plan mode works great—for small features. But when a feature gets big, the plan gets vague. There's just too much to capture, so you end up with high-level bullet points instead of real structure. And vague plans lead to hallucinations during implementation.
+Two problems plague AI-assisted coding:
 
-Claude loses sight of *why* it's building what it's building. It makes architecture decisions that contradict what you discussed. It "finishes" tasks that don't actually meet the requirements. The plan is there, but it's too shallow to keep a complex implementation on track.
+1. **Vibe coding** — Throwing prompts at Claude without structure. It makes plausible-sounding but wrong assumptions. The bigger the feature, the more it drifts.
 
-**The problem isn't Claude—it's that big features need more than a plan. They need a spec.**
+2. **Giving up too early** — Claude does its best attempt, exits, and you're left debugging half-finished work.
 
-ShipSpec replaces vague plans with structured PRDs, technical designs, and ordered tasks that keep Claude grounded throughout implementation.
+ShipSpec solves both. Specs keep Claude grounded. Ralph loops keep Claude iterating until it's actually done.
+
+## How It Works
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     THE SPEC SIDE                           │
+│                                                             │
+│   Feature Idea                                              │
+│        ↓                                                    │
+│   PRD (what to build + numbered requirements)               │
+│        ↓                                                    │
+│   SDD (how to build it + architecture decisions)            │
+│        ↓                                                    │
+│   TASKS.json (ordered work + acceptance criteria)           │
+└─────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│                    THE RALPH SIDE                           │
+│                                                             │
+│   while task_not_verified:                                  │
+│       implement(task)                                       │
+│       verify(acceptance_criteria)                           │
+│       if failed: retry with feedback                        │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Together:** Each task carries its requirements, design context, and verification criteria. The Ralph loop keeps running until those criteria pass. Claude can't drift because the spec is always there. It can't give up because the loop keeps it going.
 
 ## Why ShipSpec?
 
 | Problem | Solution |
 |---------|----------|
-| Big features make plans too vague | Structured PRD with numbered requirements |
-| Claude drifts from original intent | Requirements stay visible, linked to every task |
-| Architecture decisions get contradicted | SDD documents design choices before implementation |
-| Implementation feels chaotic | Ordered tasks with acceptance criteria and verification |
-
-**The result**: Claude always knows *why* it's building something (requirements) and *how* to build it (design), working through manageable chunks that build on each other.
+| Vibe coding makes Claude drift | Structured PRD with numbered requirements |
+| Claude forgets original intent | Requirements linked to every task |
+| Architecture decisions get contradicted | SDD documents design choices upfront |
+| Claude gives up on first attempt | Ralph loops retry until verified |
 
 ## Features
 
@@ -192,44 +217,11 @@ The `/implement-feature` command implements all tasks and runs a comprehensive f
 - **Use `/implement-task` to work through tasks manually**: Tracks progress and verifies completion
 - **Use `/implement-feature` for automation**: Implements all tasks and runs comprehensive final review
 
-## Ralph Loop Methodology
+## Inspiration
 
-This plugin uses the [Ralph Loop](https://github.com/anthropics/claude-plugins-official/tree/main/plugins/ralph-loop) methodology for iterative, self-correcting implementation.
-
-### What is Ralph Loop?
-
-Ralph Loop is a development methodology based on continuous AI agent loops. The core concept: use a **Stop hook** to intercept Claude's exit attempts and feed the same prompt back until the task is complete. This creates a self-referential feedback loop where Claude iteratively improves its work.
-
-### How ShipSpec Uses It
-
-ShipSpec adapts Ralph Loop for structured feature development:
-
-| Feature | Ralph Loop Technique |
-|---------|---------------------|
-| `/implement-task` auto-retry | Stop hook blocks exit on failed verification, retries until VERIFIED or max attempts |
-| `/implement-feature` per-task retry | Same mechanism, applied to each task during full-feature implementation |
-| `/feature-planning` task refinement | Stop hook triggers re-analysis of large tasks (>5 story points) |
-
-### Key Components
-
-1. **Stop Hooks** - Intercept session exit and trigger retry loops
-2. **State Files** - Track iteration count and current task:
-   - Pointer: `.shipspec/active-loop.local.md`
-   - State: `.shipspec/planning/<feature>/<loop-type>.local.md`
-3. **Completion Markers** - Signal successful completion (`<task-loop-complete>VERIFIED</task-loop-complete>`)
-4. **Max Iterations** - Safety limit to prevent infinite loops (default: 5 attempts per task)
-
-### Philosophy
-
-From Ralph Loop:
-- **Iteration > Perfection** - Don't aim for perfect on first try; let the loop refine the work
-- **Failures Are Data** - Failed verification tells Claude exactly what to fix
-- **Persistence Wins** - Keep trying until success; the loop handles retry logic automatically
-
-### Learn More
-
-- [Ralph Loop Plugin](https://github.com/anthropics/claude-plugins-official/tree/main/plugins/ralph-loop)
-- [Original Ralph Technique](https://ghuntley.com/ralph/)
+ShipSpec combines two ideas:
+- [Spec-driven development](https://www.atlassian.com/blog/developer/spec-driven-development-with-rovo-dev) — Planning with PRDs and SDDs before execution
+- [The Ralph Wiggum loop](https://ghuntley.com/ralph/) — Iterative loops that keep going until the work is done
 
 ## Issues & Feedback
 
