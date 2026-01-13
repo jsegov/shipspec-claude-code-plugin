@@ -61,14 +61,15 @@ Stop hooks intercept Claude's exit and feed prompts back until completion marker
 - `<feature-task-complete>VERIFIED|BLOCKED</feature-task-complete>`
 - `<feature-complete>APPROVED|APPROVED_WITH_WARNINGS</feature-complete>`
 
-State files track loop iterations: `.claude/shipspec-*.local.md`
+State files are stored alongside planning artifacts in `.shipspec/planning/<feature>/`.
 
 ## Hook Behavior
 
 All hooks share stdin sequentially. Each hook:
-1. Checks for its state file first (before reading stdin)
-2. If no state file, exits immediately (preserves stdin for other hooks)
-3. If state file exists, reads stdin and processes
+1. Checks for pointer file (`.shipspec/active-loop.local.md`) first
+2. Parses pointer to check if this hook's loop type is active
+3. If not this hook's loop type, exits immediately (preserves stdin for other hooks)
+4. If active, reads the state file from `.shipspec/planning/<feature>/<loop-type>.local.md`
 
 Empty stdin detection prevents erroneous state file deletion when multiple hooks are active.
 
@@ -80,7 +81,17 @@ Hooks expect JSON input with `transcript_path` field. Test with:
 echo '{"transcript_path": "/path/to/transcript.jsonl"}' | ./hooks/task-loop-hook.sh
 ```
 
-### State File Format
+### Pointer File Format (`.shipspec/active-loop.local.md`)
+```yaml
+---
+feature: feature-name
+loop_type: task-loop|feature-retry|planning-refine
+state_path: .shipspec/planning/feature-name/task-loop.local.md
+created_at: "2024-01-15T10:30:00Z"
+---
+```
+
+### State File Format (`.shipspec/planning/<feature>/<loop-type>.local.md`)
 ```yaml
 ---
 active: true

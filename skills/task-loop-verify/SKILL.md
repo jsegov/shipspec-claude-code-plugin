@@ -20,14 +20,38 @@ Use this skill when:
 
 ### Step 1: Read Loop State
 
-Read `.claude/shipspec-task-loop.local.md` to get current task information:
+First, check for the pointer file and get the state path:
 
 ```bash
-cat .claude/shipspec-task-loop.local.md 2>/dev/null || echo "NO_STATE_FILE"
+# Check if pointer exists and is for task-loop
+if [[ -f .shipspec/active-loop.local.md ]]; then
+  LOOP_TYPE=$(grep "^loop_type:" .shipspec/active-loop.local.md | sed 's/loop_type: *//')
+  if [[ "$LOOP_TYPE" == "task-loop" ]]; then
+    grep "^state_path:" .shipspec/active-loop.local.md | sed 's/state_path: *//'
+  else
+    echo "WRONG_LOOP_TYPE"
+  fi
+else
+  echo "NO_POINTER"
+fi
+```
+
+**If NO_POINTER or WRONG_LOOP_TYPE:**
+> "No active task loop. Run `/implement-task <feature> <task-id>` to start a task."
+> Stop here.
+
+**If state_path found:**
+Read the state file:
+```bash
+cat [state_path] 2>/dev/null || echo "NO_STATE_FILE"
 ```
 
 **If NO_STATE_FILE:**
-> "No active task loop. Run `/implement-task <feature> <task-id>` to start a task."
+Clean up stale pointer and report:
+```bash
+rm -f .shipspec/active-loop.local.md
+```
+> "No active task loop (stale pointer cleaned up). Run `/implement-task <feature> <task-id>` to start a task."
 > Stop here.
 
 **If found:**
@@ -36,6 +60,8 @@ Parse the YAML frontmatter to extract:
 - `task_id`: The task being implemented
 - `iteration`: Current attempt number
 - `max_iterations`: Maximum allowed attempts
+
+**Store the state_path for cleanup later.**
 
 ### Step 2: Load Task Prompt
 
@@ -60,7 +86,7 @@ All acceptance criteria passed.
 
 1. Clean up state file:
    ```bash
-   rm -f .claude/shipspec-task-loop.local.md
+   rm -f [state_path] .shipspec/active-loop.local.md
    ```
 
 2. Update TASKS.md: Change `[~]` to `[x]` for the task
@@ -81,7 +107,7 @@ Some criteria failed. Manual intervention required.
 
 1. Clean up state file:
    ```bash
-   rm -f .claude/shipspec-task-loop.local.md
+   rm -f [state_path] .shipspec/active-loop.local.md
    ```
 
 2. Log the failure to `.claude/shipspec-debug.log`:
@@ -106,7 +132,7 @@ Cannot verify due to infrastructure issues.
 
 1. Clean up state file:
    ```bash
-   rm -f .claude/shipspec-task-loop.local.md
+   rm -f [state_path] .shipspec/active-loop.local.md
    ```
 
 2. Log to `.claude/shipspec-debug.log`:

@@ -116,7 +116,7 @@ Show the warning message from task-manager and **stop** - wait for user to resol
      ```
    - **Clean up any existing feature retry state:**
      ```bash
-     rm -f .claude/shipspec-feature-retry.local.md
+     rm -f .shipspec/planning/$ARGUMENTS/feature-retry.local.md .shipspec/active-loop.local.md
      ```
    - **Output completion marker:**
      `<feature-task-complete>VERIFIED</feature-task-complete>`
@@ -125,14 +125,24 @@ Show the warning message from task-manager and **stop** - wait for user to resol
 
    **If INCOMPLETE:**
    - Tell user: "Task [TASK-ID] not yet complete. Continuing implementation..."
-   - **Create feature retry state file** for auto-retry (only if not already retrying this task):
+   - **Create feature retry state files** for auto-retry (only if not already retrying this task):
      ```bash
-     mkdir -p .claude
-     STATE_FILE=".claude/shipspec-feature-retry.local.md"
+     POINTER_FILE=".shipspec/active-loop.local.md"
+     STATE_FILE=".shipspec/planning/$ARGUMENTS/feature-retry.local.md"
      # Check if we're already retrying the SAME task (preserve counter for retry)
      EXISTING_TASK=$(grep "^current_task_id:" "$STATE_FILE" 2>/dev/null | sed 's/current_task_id: //' || echo "")
      if [[ "$EXISTING_TASK" != "[task-id]" ]]; then
        # New task or no state file - create fresh with counter=1
+       # Create pointer file
+       cat > "$POINTER_FILE" << 'EOF'
+     ---
+     feature: $ARGUMENTS
+     loop_type: feature-retry
+     state_path: .shipspec/planning/$ARGUMENTS/feature-retry.local.md
+     created_at: "[ISO timestamp]"
+     ---
+     EOF
+       # Create state file in feature directory
        cat > "$STATE_FILE" << 'EOF'
      ---
      active: true
@@ -160,7 +170,7 @@ Show the warning message from task-manager and **stop** - wait for user to resol
    - **If VERIFIED after implementation:**
      - Mark as `[x]` in TASKS.md
      - Log task completion
-     - Clean up state file: `rm -f .claude/shipspec-feature-retry.local.md`
+     - Clean up state file: `rm -f .shipspec/planning/$ARGUMENTS/feature-retry.local.md .shipspec/active-loop.local.md`
      - Output: `<feature-task-complete>VERIFIED</feature-task-complete>`
      - Continue to Step 4 (main loop)
    - **If still INCOMPLETE:**
@@ -170,7 +180,7 @@ Show the warning message from task-manager and **stop** - wait for user to resol
    **If BLOCKED:**
    - **Clean up any existing feature retry state:**
      ```bash
-     rm -f .claude/shipspec-feature-retry.local.md
+     rm -f .shipspec/planning/$ARGUMENTS/feature-retry.local.md .shipspec/active-loop.local.md
      ```
    - **Output blocked marker:**
      `<feature-task-complete>BLOCKED</feature-task-complete>`
@@ -234,14 +244,24 @@ Once a ready task is found:
    - Operation: `get_task`
    - Task ID: [the ready task ID from step 4.1]
 
-5. **Create feature retry state file** for auto-retry on failure (only if not already retrying this task):
+5. **Create feature retry state files** for auto-retry on failure (only if not already retrying this task):
    ```bash
-   mkdir -p .claude
-   STATE_FILE=".claude/shipspec-feature-retry.local.md"
+   POINTER_FILE=".shipspec/active-loop.local.md"
+   STATE_FILE=".shipspec/planning/$ARGUMENTS/feature-retry.local.md"
    # Check if we're already retrying the SAME task (preserve counter for retry)
    EXISTING_TASK=$(grep "^current_task_id:" "$STATE_FILE" 2>/dev/null | sed 's/current_task_id: //' || echo "")
    if [[ "$EXISTING_TASK" != "[task-id]" ]]; then
      # New task or no state file - create fresh with counter=1
+     # Create pointer file
+     cat > "$POINTER_FILE" << 'EOF'
+   ---
+   feature: $ARGUMENTS
+   loop_type: feature-retry
+   state_path: .shipspec/planning/$ARGUMENTS/feature-retry.local.md
+   created_at: "[ISO timestamp]"
+   ---
+   EOF
+     # Create state file in feature directory
      cat > "$STATE_FILE" << 'EOF'
    ---
    active: true
@@ -291,7 +311,7 @@ After implementation, verify the task:
   ```
 - **Clean up state file:**
   ```bash
-  rm -f .claude/shipspec-feature-retry.local.md
+  rm -f .shipspec/planning/$ARGUMENTS/feature-retry.local.md .shipspec/active-loop.local.md
   ```
 - **Output completion marker:**
   `<feature-task-complete>VERIFIED</feature-task-complete>`
@@ -320,7 +340,7 @@ After implementation, verify the task:
 **If BLOCKED:**
 - **Clean up state file:**
   ```bash
-  rm -f .claude/shipspec-feature-retry.local.md
+  rm -f .shipspec/planning/$ARGUMENTS/feature-retry.local.md .shipspec/active-loop.local.md
   ```
 - **Output blocked marker:**
   `<feature-task-complete>BLOCKED</feature-task-complete>`
@@ -335,7 +355,7 @@ After all tasks are marked complete, perform a comprehensive review of the entir
 
 **Clean up any remaining state file:**
 ```bash
-rm -f .claude/shipspec-feature-retry.local.md
+rm -f .shipspec/planning/$ARGUMENTS/feature-retry.local.md .shipspec/active-loop.local.md
 ```
 
 > "## All Tasks Implemented!

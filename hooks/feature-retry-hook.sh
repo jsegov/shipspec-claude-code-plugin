@@ -4,11 +4,29 @@
 
 set -euo pipefail
 
-STATE_FILE=".claude/shipspec-feature-retry.local.md"
+POINTER_FILE=".shipspec/active-loop.local.md"
+EXPECTED_LOOP_TYPE="feature-retry"
 
-# Exit early if no feature retry active - BEFORE consuming stdin
+# Exit early if no pointer file - BEFORE consuming stdin
 # (Multiple hooks share stdin; inactive hooks must not consume it)
-if [[ ! -f "$STATE_FILE" ]]; then
+if [[ ! -f "$POINTER_FILE" ]]; then
+  exit 0
+fi
+
+# Parse pointer file to get loop type and state path
+POINTER_FRONTMATTER=$(sed -n '/^---$/,/^---$/{ /^---$/d; p; }' "$POINTER_FILE")
+LOOP_TYPE=$(echo "$POINTER_FRONTMATTER" | grep '^loop_type:' | sed 's/loop_type: *//' || echo "")
+STATE_FILE=$(echo "$POINTER_FRONTMATTER" | grep '^state_path:' | sed 's/state_path: *//' || echo "")
+
+# Exit if this hook's loop type is not active
+if [[ "$LOOP_TYPE" != "$EXPECTED_LOOP_TYPE" ]]; then
+  exit 0
+fi
+
+# Exit if state file doesn't exist (stale pointer)
+if [[ -z "$STATE_FILE" ]] || [[ ! -f "$STATE_FILE" ]]; then
+  echo "⚠️ Feature retry: Pointer references non-existent state file" >&2
+  rm -f "$POINTER_FILE"  # Clean up stale pointer
   exit 0
 fi
 
@@ -44,7 +62,7 @@ if [[ ! "$TASK_ATTEMPT" =~ ^[0-9]+$ ]]; then
   echo "   File: $STATE_FILE" >&2
   echo "   Problem: 'task_attempt' field is not a valid number (got: '$TASK_ATTEMPT')" >&2
   echo "   Run /cancel-feature-retry or delete the file manually" >&2
-  rm -f "$STATE_FILE"
+  rm -f "$STATE_FILE" "$POINTER_FILE"
   exit 0
 fi
 
@@ -53,7 +71,7 @@ if [[ ! "$MAX_ATTEMPTS" =~ ^[0-9]+$ ]]; then
   echo "   File: $STATE_FILE" >&2
   echo "   Problem: 'max_task_attempts' field is not a valid number (got: '$MAX_ATTEMPTS')" >&2
   echo "   Run /cancel-feature-retry or delete the file manually" >&2
-  rm -f "$STATE_FILE"
+  rm -f "$STATE_FILE" "$POINTER_FILE"
   exit 0
 fi
 
@@ -68,21 +86,21 @@ if [[ -z "$PROMPT_TEXT" ]]; then
   echo "     - File was corrupted during writing" >&2
   echo "" >&2
   echo "   Run /cancel-feature-retry or delete the file manually" >&2
-  rm -f "$STATE_FILE"
+  rm -f "$STATE_FILE" "$POINTER_FILE"
   exit 0
 fi
 
 # Validate transcript exists and has content
 if [[ -z "$TRANSCRIPT_PATH" ]] || [[ ! -f "$TRANSCRIPT_PATH" ]]; then
   echo "⚠️ Feature retry: Transcript not found, allowing exit" >&2
-  rm -f "$STATE_FILE"
+  rm -f "$STATE_FILE" "$POINTER_FILE"
   exit 0
 fi
 
 # Check for assistant messages
 if ! grep -q '"role":"assistant"' "$TRANSCRIPT_PATH" 2>/dev/null; then
   echo "⚠️ Feature retry: No assistant messages in transcript, allowing exit" >&2
-  rm -f "$STATE_FILE"
+  rm -f "$STATE_FILE" "$POINTER_FILE"
   exit 0
 fi
 
@@ -90,7 +108,7 @@ fi
 LAST_LINE=$(grep '"role":"assistant"' "$TRANSCRIPT_PATH" | tail -1)
 if [[ -z "$LAST_LINE" ]]; then
   echo "⚠️ Feature retry: Failed to extract last assistant message" >&2
-  rm -f "$STATE_FILE"
+  rm -f "$STATE_FILE" "$POINTER_FILE"
   exit 0
 fi
 
@@ -104,26 +122,26 @@ LAST_OUTPUT=$(echo "$LAST_LINE" | jq -r '
 
 if [[ -z "$LAST_OUTPUT" ]]; then
   echo "⚠️ Feature retry: Assistant message contained no text" >&2
-  rm -f "$STATE_FILE"
+  rm -f "$STATE_FILE" "$POINTER_FILE"
   exit 0
 fi
 
 # Check for completion markers
 # Feature task complete - allow exit to continue to next task
 if echo "$LAST_OUTPUT" | grep -q '<feature-task-complete>VERIFIED</feature-task-complete>'; then
-  rm -f "$STATE_FILE"
+  rm -f "$STATE_FILE" "$POINTER_FILE"
   exit 0
 fi
 
 # Task blocked - allow exit, needs manual intervention
 if echo "$LAST_OUTPUT" | grep -q '<feature-task-complete>BLOCKED</feature-task-complete>'; then
-  rm -f "$STATE_FILE"
+  rm -f "$STATE_FILE" "$POINTER_FILE"
   exit 0
 fi
 
 # Feature complete marker - all tasks done
 if echo "$LAST_OUTPUT" | grep -q '<feature-complete>'; then
-  rm -f "$STATE_FILE"
+  rm -f "$STATE_FILE" "$POINTER_FILE"
   exit 0
 fi
 
@@ -131,7 +149,7 @@ fi
 if [[ $MAX_ATTEMPTS -gt 0 ]] && [[ $TASK_ATTEMPT -ge $MAX_ATTEMPTS ]]; then
   echo "⚠️ Feature retry: Max attempts ($MAX_ATTEMPTS) reached for $TASK_ID" >&2
   echo "   Run /cancel-feature-retry to clear state if needed" >&2
-  rm -f "$STATE_FILE"
+  rm -f "$STATE_FILE" "$POINTER_FILE"
   exit 0
 fi
 

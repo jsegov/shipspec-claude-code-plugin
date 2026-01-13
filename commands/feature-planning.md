@@ -358,10 +358,20 @@ Use AskUserQuestion with options:
 
 ### 8.2: Initialize Refinement Loop
 
-Create state file:
+Create state files:
 ```bash
-mkdir -p .claude
-cat > .claude/shipspec-planning-refine.local.md << EOF
+# Create pointer file
+cat > .shipspec/active-loop.local.md << EOF
+---
+feature: [FEATURE_DIR]
+loop_type: planning-refine
+state_path: .shipspec/planning/[FEATURE_DIR]/planning-refine.local.md
+created_at: "[ISO timestamp]"
+---
+EOF
+
+# Create state file in feature directory
+cat > .shipspec/planning/[FEATURE_DIR]/planning-refine.local.md << EOF
 ---
 active: true
 feature: [FEATURE_DIR]
@@ -445,7 +455,7 @@ After processing all large tasks:
 
 Clean up:
 ```bash
-rm -f .claude/shipspec-planning-refine.local.md
+rm -f .shipspec/planning/[FEATURE_DIR]/planning-refine.local.md .shipspec/active-loop.local.md
 ```
 
 ---

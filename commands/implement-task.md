@@ -155,7 +155,7 @@ $(date -u +%Y-%m-%dT%H:%M:%SZ) | [task-id] | VERIFY | [VERIFIED|INCOMPLETE|BLOCK
   - Show the user what's missing
   - **Clean up loop state and output incomplete marker:**
     ```bash
-    rm -f .claude/shipspec-task-loop.local.md
+    rm -f .shipspec/planning/[feature-dir]/task-loop.local.md .shipspec/active-loop.local.md
     ```
     Then output: `<task-loop-complete>INCOMPLETE</task-loop-complete>`
   - Tell user: "Task [TASK-ID] is not complete. Please address the issues above, then run this command again."
@@ -166,7 +166,7 @@ $(date -u +%Y-%m-%dT%H:%M:%SZ) | [task-id] | VERIFY | [VERIFIED|INCOMPLETE|BLOCK
   - Show the blocking reason
   - **Clean up loop state and output blocked marker:**
     ```bash
-    rm -f .claude/shipspec-task-loop.local.md
+    rm -f .shipspec/planning/[feature-dir]/task-loop.local.md .shipspec/active-loop.local.md
     ```
     Then output: `<task-loop-complete>BLOCKED</task-loop-complete>`
   - Ask user how they want to proceed
@@ -200,7 +200,7 @@ Check if the task has a `## References` section containing SDD or PRD references
      ```
    - **Clean up loop state and output completion marker:**
      ```bash
-     rm -f .claude/shipspec-task-loop.local.md
+     rm -f .shipspec/planning/[feature-dir]/task-loop.local.md .shipspec/active-loop.local.md
      ```
      Then output: `<task-loop-complete>VERIFIED</task-loop-complete>`
    - Tell user: "Task [TASK-ID] complete! Moving to next task..."
@@ -211,7 +211,7 @@ Check if the task has a `## References` section containing SDD or PRD references
    - Show specific misalignment issues
    - **Clean up loop state and output misaligned marker:**
      ```bash
-     rm -f .claude/shipspec-task-loop.local.md
+     rm -f .shipspec/planning/[feature-dir]/task-loop.local.md .shipspec/active-loop.local.md
      ```
      Then output: `<task-loop-complete>MISALIGNED</task-loop-complete>`
    - Tell user: "Implementation doesn't match design/requirements. Please fix the issues above."
@@ -227,7 +227,7 @@ Check if the task has a `## References` section containing SDD or PRD references
      ```
    - **Clean up loop state and output completion marker:**
      ```bash
-     rm -f .claude/shipspec-task-loop.local.md
+     rm -f .shipspec/planning/[feature-dir]/task-loop.local.md .shipspec/active-loop.local.md
      ```
      Then output: `<task-loop-complete>VERIFIED</task-loop-complete>`
    - Tell user: "Task [TASK-ID] complete with warnings. Moving to next task..."
@@ -242,7 +242,7 @@ Check if the task has a `## References` section containing SDD or PRD references
   ```
 - **Clean up loop state and output completion marker:**
   ```bash
-  rm -f .claude/shipspec-task-loop.local.md
+  rm -f .shipspec/planning/[feature-dir]/task-loop.local.md .shipspec/active-loop.local.md
   ```
   Then output: `<task-loop-complete>VERIFIED</task-loop-complete>`
 - Tell user: "Task [TASK-ID] verified complete! Moving to next task..."
@@ -306,11 +306,21 @@ Once a target task is identified:
 
 ## Step 6.5: Initialize Loop State
 
-After starting the task, create the loop state file for automatic retry:
+After starting the task, create the loop state files for automatic retry:
 
 ```bash
-mkdir -p .claude
-cat > .claude/shipspec-task-loop.local.md << 'EOF'
+# Create pointer file
+cat > .shipspec/active-loop.local.md << 'EOF'
+---
+feature: [feature-dir]
+loop_type: task-loop
+state_path: .shipspec/planning/[feature-dir]/task-loop.local.md
+created_at: "[ISO timestamp]"
+---
+EOF
+
+# Create state file in feature directory
+cat > .shipspec/planning/[feature-dir]/task-loop.local.md << 'EOF'
 ---
 active: true
 feature: [feature-dir]

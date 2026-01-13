@@ -213,7 +213,9 @@ ShipSpec adapts Ralph Loop for structured feature development:
 ### Key Components
 
 1. **Stop Hooks** - Intercept session exit and trigger retry loops
-2. **State Files** - Track iteration count and current task (`.claude/shipspec-*.local.md`)
+2. **State Files** - Track iteration count and current task:
+   - Pointer: `.shipspec/active-loop.local.md`
+   - State: `.shipspec/planning/<feature>/<loop-type>.local.md`
 3. **Completion Markers** - Signal successful completion (`<task-loop-complete>VERIFIED</task-loop-complete>`)
 4. **Max Iterations** - Safety limit to prevent infinite loops (default: 5 attempts per task)
 
