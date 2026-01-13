@@ -77,22 +77,28 @@ All acceptance criteria passed.
 
 #### INCOMPLETE
 
-Some criteria failed.
+Some criteria failed. Manual intervention required.
 
-1. Log the failure to `.claude/shipspec-debug.log`:
+1. Clean up state file:
+   ```bash
+   rm -f .claude/shipspec-task-loop.local.md
    ```
-   $(date -u +%Y-%m-%dT%H:%M:%SZ) | [task_id] | VERIFY | INCOMPLETE | [brief failure reason]
+
+2. Log the failure to `.claude/shipspec-debug.log`:
+   ```
+   $(date -u +%Y-%m-%dT%H:%M:%SZ) | [task_id] | LOOP_END | INCOMPLETE | [brief failure reason]
    ```
 
-2. **DO NOT output completion marker** - the stop hook will trigger a retry
+3. **Output the incomplete marker:**
+   `<task-loop-complete>INCOMPLETE</task-loop-complete>`
 
-3. Show the user what failed:
-   > "## Verification Failed - Attempt [iteration]/[max_iterations]
+4. Show the user what failed:
+   > "## Verification Failed
    >
    > The following criteria are not met:
    > - [List failed criteria]
    >
-   > Please fix these issues. The loop will retry automatically."
+   > Please fix these issues and run `/implement-task [feature]` again."
 
 #### BLOCKED
 
@@ -116,6 +122,7 @@ Cannot verify due to infrastructure issues.
 ## Important Notes
 
 1. **Completion markers are critical** - the stop hook looks for these to decide whether to allow session exit
-2. **Never output marker for INCOMPLETE** - this allows the retry loop to continue
-3. **BLOCKED always exits** - tasks that can't be verified need manual attention
-4. **State file cleanup** - always remove on VERIFIED or BLOCKED to prevent stale loops
+2. **All results output markers** - VERIFIED, INCOMPLETE, and BLOCKED all output completion markers to exit the loop
+3. **INCOMPLETE requires manual fix** - user must address issues and re-run `/implement-task`
+4. **BLOCKED needs investigation** - tasks that can't be verified need manual attention
+5. **State file cleanup** - always remove on any completion (VERIFIED, INCOMPLETE, or BLOCKED) to prevent stale loops

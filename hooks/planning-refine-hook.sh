@@ -14,6 +14,14 @@ fi
 
 # Only read stdin if this hook is active
 INPUT=$(cat)
+
+# Check if stdin was already consumed by another hook
+if [[ -z "$INPUT" ]]; then
+  echo "⚠️ Planning refine: No stdin received (likely consumed by another active hook)" >&2
+  echo "   State file preserved for next session" >&2
+  exit 0  # Exit without deleting state - loop continues next time
+fi
+
 TRANSCRIPT_PATH=$(echo "$INPUT" | jq -r '.transcript_path // empty')
 
 # Parse YAML frontmatter only (not prompt body)

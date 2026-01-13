@@ -14,6 +14,14 @@ fi
 
 # Only read stdin if this hook is active
 INPUT=$(cat)
+
+# Check if stdin was already consumed by another hook
+if [[ -z "$INPUT" ]]; then
+  echo "⚠️ Feature retry: No stdin received (likely consumed by another active hook)" >&2
+  echo "   State file preserved for next session" >&2
+  exit 0  # Exit without deleting state - loop continues next time
+fi
+
 TRANSCRIPT_PATH=$(echo "$INPUT" | jq -r '.transcript_path // empty')
 
 # Parse YAML frontmatter only (not prompt body)
@@ -133,13 +141,24 @@ TEMP_FILE="${STATE_FILE}.tmp.$$"
 sed "s/^task_attempt: .*/task_attempt: $NEXT_ATTEMPT/" "$STATE_FILE" > "$TEMP_FILE"
 mv "$TEMP_FILE" "$STATE_FILE"
 
-# Build system message
+# Build context-aware system message
 MAX_DISPLAY="$MAX_ATTEMPTS"
 if [[ "$MAX_ATTEMPTS" == "0" ]]; then
   MAX_DISPLAY="unlimited"
 fi
 
-SYSTEM_MSG="🔄 **Feature Implementation: Task Retry**
+if [[ $NEXT_ATTEMPT -eq 2 ]]; then
+  # First retry - task was just started
+  SYSTEM_MSG="🔄 **Feature Implementation: Task Retry**
+
+**Feature:** $FEATURE
+**Task:** $TASK_ID (Attempt $NEXT_ATTEMPT/$MAX_DISPLAY)
+**Progress:** $TASKS_COMPLETED/$TOTAL_TASKS tasks completed
+
+Continue implementing the task."
+else
+  # Subsequent retries - verification ran and failed
+  SYSTEM_MSG="🔄 **Feature Implementation: Task Retry**
 
 **Feature:** $FEATURE
 **Task:** $TASK_ID (Attempt $NEXT_ATTEMPT/$MAX_DISPLAY)
@@ -147,6 +166,7 @@ SYSTEM_MSG="🔄 **Feature Implementation: Task Retry**
 
 Previous attempt did not pass all acceptance criteria.
 Review what failed and fix the implementation."
+fi
 
 # Return block decision - feed original prompt back for another attempt
 jq -n \
