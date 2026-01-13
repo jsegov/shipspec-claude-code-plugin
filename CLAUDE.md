@@ -108,3 +108,10 @@ max_iterations: 5
 
 ### Task Sizing
 Fibonacci story points (1, 2, 3, 5, 8). Tasks >5 points trigger auto-refinement.
+
+### Version Bumping
+When updating the plugin version, update both files:
+- `.claude-plugin/plugin.json` - the actual plugin version
+- `.claude-plugin/marketplace.json` - the version advertised in the marketplace
+
+These are not automatically synced.

@@ -10,7 +10,7 @@
     {
       "name": "shipspec",
       "description": "Spec-driven development for Claude Code. Plan bigger features with persistent PRDs, technical designs, and implementation tasks that keep your AI coding agent on track across sessions.",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "author": {
         "name": "ShipSpec"
       },
