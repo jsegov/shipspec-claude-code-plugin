@@ -3,8 +3,7 @@ description: Cancel active task implementation loop
 allowed-tools:
   - Bash(test:*)
   - Bash(rm:*)
-  - Bash(grep:*)
-  - Bash(sed:*)
+  - Bash(jq:*)
   - Read
 ---
 
@@ -16,7 +15,7 @@ Cancel an active task implementation loop.
 
 Check for the pointer file:
 ```bash
-test -f .shipspec/active-loop.local.md && echo "POINTER_EXISTS" || echo "NOT_FOUND"
+test -f .shipspec/active-loop.local.json && echo "POINTER_EXISTS" || echo "NOT_FOUND"
 ```
 
 **If NOT_FOUND:**
@@ -27,7 +26,7 @@ test -f .shipspec/active-loop.local.md && echo "POINTER_EXISTS" || echo "NOT_FOU
 **If POINTER_EXISTS:**
 Read the pointer file and verify it's a task-loop:
 ```bash
-grep "^loop_type:" .shipspec/active-loop.local.md
+jq -r '.loop_type // empty' .shipspec/active-loop.local.json
 ```
 
 **If loop_type is NOT "task-loop":**
@@ -39,15 +38,17 @@ grep "^loop_type:" .shipspec/active-loop.local.md
 
 Extract the state path from the pointer:
 ```bash
-grep "^state_path:" .shipspec/active-loop.local.md | sed 's/state_path: *//'
+jq -r '.state_path // empty' .shipspec/active-loop.local.json
 ```
 
-Read the state file using the extracted path:
-```
-Read [state_path]
+Parse the state file (JSON) to extract:
+```bash
+jq -r '.task_id // empty' [state_path]
+jq -r '.feature // empty' [state_path]
+jq -r '.iteration // 0' [state_path]
+jq -r '.max_iterations // 5' [state_path]
 ```
 
-Extract from the YAML frontmatter:
 - `task_id` - the task being implemented
 - `feature` - the feature name
 - `iteration` - current attempt number
@@ -58,7 +59,7 @@ Extract from the YAML frontmatter:
 Remove both the state file and pointer:
 
 ```bash
-rm -f [state_path] .shipspec/active-loop.local.md
+rm -f [state_path] .shipspec/active-loop.local.json
 ```
 
 ## Step 4: Report
@@ -67,5 +68,5 @@ rm -f [state_path] .shipspec/active-loop.local.md
 >
 > - Was at iteration: [ITERATION]/[MAX_ITERATIONS]
 >
-> The task remains in `[~]` (in-progress) status in TASKS.md.
-> Run `/implement-task [feature]` to resume, or manually update the task status."
+> The task remains in `in_progress` status in TASKS.json.
+> Run `/implement-task [feature]` to resume, or use task-manager to update the task status."

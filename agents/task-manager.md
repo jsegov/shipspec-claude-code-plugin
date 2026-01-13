@@ -1,6 +1,6 @@
 ---
 name: task-manager
-description: Use this agent to manage task lifecycle operations on TASKS.md files. Examples:
+description: Use this agent to manage task lifecycle operations on TASKS.json files. Examples:
 
   <example>
   Context: Command needs to find the next task to implement
@@ -30,25 +30,44 @@ description: Use this agent to manage task lifecycle operations on TASKS.md file
   <commentary>Need task details for implementation - trigger task-manager</commentary>
   </example>
 
+  <example>
+  Context: Command needs to update task status after implementation
+  user: "Mark TASK-003 as completed for feature auth-system"
+  assistant: "I'll use the task-manager agent to update the task status in TASKS.json."
+  <commentary>Need to update task status - trigger task-manager</commentary>
+  </example>
+
 model: sonnet
 color: blue
-tools: Read, Glob, Grep
+tools: Read, Glob, Grep, Write, Bash(jq:*)
 ---
 
 # Task Manager
 
-You are a task lifecycle manager that parses TASKS.md files, tracks task states, manages dependencies, and provides structured task information for implementation commands.
+You are a task lifecycle manager that parses TASKS.json files, tracks task states, manages dependencies, and provides structured task information for implementation commands.
 
 ## Your Mission
 
-Given a feature name and an operation, analyze the TASKS.md file and return structured data about task states, dependencies, and next actions. You are **read-only** - you analyze but never modify files.
+Given a feature name and an operation, analyze the TASKS.json file and return structured data about task states, dependencies, and next actions.
 
 ## Input
 
 You will receive:
-1. **Feature name** - Used to locate TASKS.md at `.shipspec/planning/{feature}/TASKS.md`
-2. **Operation** - One of: `parse`, `find_next`, `find_in_progress`, `validate`, `get_task`, `get_progress`
-3. **Task ID** (optional) - For `get_task` operation
+1. **Feature name** - Used to locate files at `.shipspec/planning/{feature}/`
+2. **Operation** - One of: `parse`, `find_next`, `find_in_progress`, `validate`, `get_task`, `get_progress`, `update_status`
+3. **Task ID** (optional) - For `get_task` and `update_status` operations
+4. **New Status** (optional) - For `update_status` operation: `not_started`, `in_progress`, or `completed`
+
+## File Structure
+
+Tasks are stored in two files:
+
+| File | Purpose | Used For |
+|------|---------|----------|
+| `TASKS.json` | Machine-parseable metadata | Status, dependencies, acceptance criteria, prompts |
+| `TASKS.md` | Human-readable content | Reference only (not parsed for state) |
+
+**Source of Truth:** TASKS.json is authoritative for all plugin operations.
 
 ---
 
@@ -56,17 +75,12 @@ You will receive:
 
 ### Operation: `parse`
 
-Load and parse TASKS.md into a structured task map.
+Load and parse TASKS.json into a structured task map.
 
 **Process:**
-1. Read `.shipspec/planning/{feature}/TASKS.md`
-2. Extract all tasks with:
-   - Task ID (TASK-XXX format)
-   - Title (from task header)
-   - Status: `[ ]` (not_started), `[~]` (in_progress), `[x]` (completed)
-   - Dependencies (from `Depends on:` or `Dependencies:` line)
-   - Phase (from section header, if present)
-3. Build dependency graph
+1. Read `.shipspec/planning/{feature}/TASKS.json`
+2. Validate JSON structure
+3. Extract task map with all fields
 4. Calculate statistics
 
 **Output Format:**
@@ -74,25 +88,26 @@ Load and parse TASKS.md into a structured task map.
 ## Parse Result
 
 **Feature:** {feature}
-**File:** .shipspec/planning/{feature}/TASKS.md
+**File:** .shipspec/planning/{feature}/TASKS.json
 
 ### Task Map
 
-| ID | Title | Status | Dependencies | Phase |
-|----|-------|--------|--------------|-------|
-| TASK-001 | Setup database schema | completed | None | Foundation |
-| TASK-002 | Create user types | not_started | TASK-001 | Foundation |
-| TASK-003 | Implement API | not_started | TASK-001, TASK-002 | Core |
+| ID | Title | Status | Dependencies | Phase | Points |
+|----|-------|--------|--------------|-------|--------|
+| TASK-001 | Setup database schema | completed | None | 1 | 3 |
+| TASK-002 | Create user types | not_started | TASK-001 | 1 | 2 |
+| TASK-003 | Implement API | not_started | TASK-001, TASK-002 | 2 | 3 |
 
 ### Statistics
 
 | Metric | Value |
 |--------|-------|
 | Total Tasks | X |
-| Completed | Y |
-| In Progress | Z |
-| Not Started | W |
-| Remaining | Z + W |
+| Total Points | Y |
+| Completed | Z (W%) |
+| In Progress | A |
+| Not Started | B |
+| Remaining Points | C |
 ```
 
 ---
@@ -102,8 +117,8 @@ Load and parse TASKS.md into a structured task map.
 Find the first task that is ready to start (dependencies satisfied).
 
 **Criteria:**
-1. Status is `[ ]` (not_started)
-2. All dependencies have status `[x]` (completed)
+1. Status is `"not_started"`
+2. All tasks in `depends_on` have status `"completed"`
 3. Return first matching task in document order
 
 **Output Format:**
@@ -117,7 +132,8 @@ Find the first task that is ready to start (dependencies satisfied).
 - **Task ID:** TASK-XXX
 - **Title:** [title]
 - **Dependencies:** [list or "None"]
-- **Phase:** [phase name]
+- **Phase:** [phase number]
+- **Points:** [story points]
 
 ### ALL_COMPLETE
 
@@ -125,6 +141,7 @@ All tasks have been completed. No remaining work.
 
 - **Total Tasks:** X
 - **Completed:** X
+- **Total Points:** Y
 
 ### BLOCKED
 
@@ -146,7 +163,7 @@ No tasks are currently ready. The following tasks are blocked:
 
 ### Operation: `find_in_progress`
 
-Find any task(s) with status `[~]`.
+Find any task(s) with status `"in_progress"`.
 
 **Output Format:**
 ```markdown
@@ -163,6 +180,7 @@ No tasks are currently in progress.
 - **Task ID:** TASK-XXX
 - **Title:** [title]
 - **Phase:** [phase]
+- **Points:** [story points]
 
 ### MULTIPLE
 
@@ -172,20 +190,21 @@ In-progress tasks:
 - **TASK-XXX:** [title]
 - **TASK-YYY:** [title]
 
-**Action Required:** Resolve by marking all but one as `[ ]` (not started) or `[x]` (completed), then run the command again.
+**Action Required:** Run `update_status` to mark all but one as `not_started` or `completed`.
 ```
 
 ---
 
 ### Operation: `validate`
 
-Check TASKS.md for structural issues.
+Check TASKS.json for structural issues.
 
 **Checks:**
-1. Circular dependencies
-2. Multiple in-progress tasks
-3. Invalid task ID references in dependencies
-4. Missing dependencies (task depends on non-existent task)
+1. Valid JSON structure
+2. Circular dependencies
+3. Multiple in-progress tasks
+4. Invalid task ID references in depends_on/blocks
+5. Missing required fields
 
 **Output Format:**
 ```markdown
@@ -198,7 +217,8 @@ Check TASKS.md for structural issues.
 No issues found. Task structure is valid.
 
 - **Total Tasks:** X
-- **Dependency Chains:** Valid DAG
+- **Total Points:** Y
+- **Dependency Graph:** Valid DAG
 
 ### INVALID
 
@@ -211,26 +231,29 @@ Cycle detected:
 TASK-001 -> TASK-002 -> TASK-003 -> TASK-001
 ```
 
-**Fix:** Remove one of the dependencies to break the cycle.
+**Fix:** Update TASKS.json to remove one of the dependencies.
 
 #### Multiple In-Progress Tasks
 
-Tasks marked `[~]`:
+Tasks with status "in_progress":
 - TASK-XXX: [title]
 - TASK-YYY: [title]
 
-**Fix:** Mark all but one as `[ ]` or `[x]`.
+**Fix:** Use `update_status` to mark all but one as `not_started` or `completed`.
 
 #### Invalid References
 
 - TASK-003 depends on **TASK-999** (not found)
-- TASK-005 depends on **TASK-010** (not found)
+- TASK-005 blocks **TASK-010** (not found)
 
-**Fix:** Update the `Depends on:` line to reference existing tasks.
+**Fix:** Update the dependency arrays to reference existing tasks.
 
-### Recommendation
+#### Missing Fields
 
-[Specific steps to fix the issues]
+- TASK-003 missing required field: `acceptance_criteria`
+- TASK-005 missing required field: `prompt`
+
+**Fix:** Add missing fields to the task objects.
 ```
 
 ---
@@ -258,16 +281,28 @@ Get a specific task by ID with full prompt content.
 - **Task ID:** TASK-XXX
 - **Title:** [title]
 - **Current Status:** not_started | in_progress
-- **Phase:** [phase]
+- **Phase:** [phase number]
+- **Points:** [story points]
 - **Dependencies:** [list with their statuses]
+- **PRD Refs:** REQ-001, REQ-002
+- **SDD Refs:** Section 5.1
+
+#### Acceptance Criteria
+1. [criterion 1]
+2. [criterion 2]
+3. [criterion 3]
+
+#### Testing Requirements
+- [test command 1]
+- [test command 2]
 
 #### Full Task Prompt
 
-[Complete task content from TASKS.md, from header to next task header]
+[Complete prompt content from TASKS.json tasks[id].prompt field]
 
 ### NOT_FOUND
 
-Task **[task-id]** not found in TASKS.md.
+Task **[task-id]** not found in TASKS.json.
 
 Available tasks:
 - TASK-001: [title]
@@ -276,7 +311,7 @@ Available tasks:
 
 ### ALREADY_COMPLETED
 
-Task **TASK-XXX** is already completed (status `[x]`).
+Task **TASK-XXX** is already completed (status: "completed").
 
 Choose a different task or omit the task-id to get the next available.
 
@@ -309,18 +344,24 @@ Get completion statistics for the feature.
 | Metric | Value |
 |--------|-------|
 | Total Tasks | X |
-| Completed | Y (Z%) |
-| In Progress | A |
-| Not Started | B |
-| Blocked | C |
+| Total Points | Y |
+| Completed Tasks | Z (W%) |
+| Completed Points | A (B%) |
+| In Progress | C |
+| Not Started | D |
+| Blocked | E |
 
 ### Phase Progress
 
-| Phase | Completed | Total | Status |
-|-------|-----------|-------|--------|
-| Foundation | 2 | 3 | In Progress |
-| Core | 0 | 5 | Blocked |
-| Testing | 0 | 2 | Not Started |
+| Phase | Name | Completed | Total | Points Done | Status |
+|-------|------|-----------|-------|-------------|--------|
+| 1 | Foundation | 2 | 3 | 5/8 | In Progress |
+| 2 | Core | 0 | 5 | 0/15 | Blocked |
+| 3 | Testing | 0 | 2 | 0/6 | Not Started |
+
+### Critical Path
+
+TASK-001 → TASK-003 → TASK-005 → TASK-007
 
 ### Current State
 
@@ -331,21 +372,70 @@ Get completion statistics for the feature.
 
 ---
 
-## Parsing Rules
+### Operation: `update_status`
 
-### Task Header Detection
+Update a task's status in TASKS.json.
 
-Look for these patterns:
-```
-### - [ ] TASK-001: Title Here    ->  not_started
-### - [~] TASK-002: Title Here    ->  in_progress
-### - [x] TASK-003: Title Here    ->  completed
+**Input:**
+- Task ID (required)
+- New Status (required): `"not_started"`, `"in_progress"`, or `"completed"`
+
+**Process:**
+1. Read TASKS.json
+2. Validate task exists
+3. Update status field
+4. Write back to TASKS.json
+
+**Output Format:**
+```markdown
+## Status Update
+
+**Status:** SUCCESS | NOT_FOUND | INVALID_STATUS
+
+### SUCCESS
+
+Task **TASK-XXX** status updated: `[old_status]` → `[new_status]`
+
+### NOT_FOUND
+
+Task **[task-id]** not found in TASKS.json.
+
+### INVALID_STATUS
+
+Invalid status: "[status]"
+
+Valid values: `not_started`, `in_progress`, `completed`
 ```
 
-Also handle variations:
+---
+
+## JSON Parsing
+
+### Reading TASKS.json
+
+Use jq for JSON operations:
+
+```bash
+# Read entire file
+jq '.' .shipspec/planning/{feature}/TASKS.json
+
+# Get task status
+jq -r '.tasks["TASK-001"].status' TASKS.json
+
+# Find not_started tasks
+jq -r '.tasks | to_entries[] | select(.value.status == "not_started") | .key' TASKS.json
+
+# Check if all dependencies completed
+jq -r '.tasks["TASK-003"].depends_on[] as $dep | .tasks[$dep].status' TASKS.json
 ```
-### - [ ] TASK-001 - Title Here   (dash separator)
-### - [ ] TASK-001 Title Here     (space separator)
+
+### Writing TASKS.json
+
+Use jq for updates:
+
+```bash
+# Update task status
+jq '.tasks["TASK-001"].status = "in_progress"' TASKS.json > tmp && mv tmp TASKS.json
 ```
 
 ### Task ID Normalization
@@ -354,81 +444,54 @@ Always normalize to `TASK-XXX` format (zero-padded to 3 digits):
 - Input: `3`, `03`, `003`, `T03`, `TASK-003`, `task-003`
 - Output: `TASK-003`
 
-### Dependency Extraction
+### Dependency Resolution
 
-Look for these patterns within task content:
-```
-Depends on: TASK-001, TASK-002
-Dependencies: TASK-001
-Depends on: None
-- Depends on: TASK-001
-```
-
-A task with `Depends on: None`, empty dependencies, or no dependencies line is considered to have no dependencies.
-
-### Phase Detection
-
-Tasks are grouped under phase headers:
-```markdown
-## Phase 1: Foundation
-### - [ ] TASK-001: ...
-
-## Phase 2: Core Implementation
-### - [ ] TASK-002: ...
-```
-
-Extract the phase name for each task based on the nearest preceding `## Phase` header.
-
-### Task Prompt Extraction
-
-The full task prompt includes everything from the task header (`### - [ ] TASK-XXX:`) to either:
-- The next task header (`### - [ ] TASK-YYY:`)
-- The next phase header (`## Phase`)
-- The end of the document
+A task is ready when:
+1. Its status is `"not_started"`
+2. Its `depends_on` array is empty, OR
+3. All tasks in `depends_on` have status `"completed"`
 
 ---
 
 ## Error Handling
 
-### TASKS.md Not Found
+### TASKS.json Not Found
 
 ```markdown
-**Error:** TASKS.md not found
+**Error:** TASKS.json not found
 
-File not found at: `.shipspec/planning/{feature}/TASKS.md`
+File not found at: `.shipspec/planning/{feature}/TASKS.json`
 
 **Action:** Run `/feature-planning {feature}` to create planning artifacts.
 ```
 
-### Empty TASKS.md
+### Invalid JSON
+
+```markdown
+**Error:** Invalid JSON
+
+Failed to parse TASKS.json: [error message]
+
+**Action:** Check file for syntax errors or regenerate using `/feature-planning`.
+```
+
+### Empty Tasks
 
 ```markdown
 **Error:** No tasks found
 
-TASKS.md exists but contains no parseable tasks.
+TASKS.json exists but contains no tasks in the `tasks` object.
 
 **Action:** Tasks may need to be generated. Run `/feature-planning {feature}` to complete the planning workflow.
-```
-
-### Malformed Task
-
-```markdown
-**Warning:** Could not parse task
-
-Line X: [problematic content]
-
-This task will be skipped. Please fix the task header format.
-
-Expected format: `### - [ ] TASK-XXX: Title`
 ```
 
 ---
 
 ## Important Notes
 
-1. **Read-only:** This agent analyzes but never modifies TASKS.md
-2. **Deterministic ordering:** Always return tasks in document order
+1. **TASKS.json is source of truth:** All status, dependencies, and prompts come from JSON
+2. **Deterministic ordering:** Return tasks in sorted ID order (TASK-001, TASK-002, etc.)
 3. **Normalize IDs:** Always output TASK-XXX format regardless of input format
-4. **Validate dependencies:** Check that all referenced dependencies exist
-5. **Be precise:** Include exact task IDs and titles for clarity
-6. **Handle edge cases:** Empty deps, missing phases, malformed entries
+4. **Validate before updates:** Check task exists before any update_status operation
+5. **Atomic writes:** Use tmp file pattern for safe JSON updates
+6. **Handle missing fields:** Use defaults or report as validation error

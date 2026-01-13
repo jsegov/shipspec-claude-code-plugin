@@ -2,7 +2,7 @@
 name: task-loop-verify
 description: Verify the current task and output a completion marker. Use this to check if a task is complete and signal the stop hook to allow session exit.
 version: 0.1.0
-allowed-tools: Read, Glob, Grep, Bash(rm:*), Task
+allowed-tools: Read, Glob, Grep, Bash(rm:*), Bash(jq:*), Task
 ---
 
 # Task Loop Verification
@@ -23,11 +23,10 @@ Use this skill when:
 First, check for the pointer file and get the state path:
 
 ```bash
-# Check if pointer exists and is for task-loop
-if [[ -f .shipspec/active-loop.local.md ]]; then
-  LOOP_TYPE=$(grep "^loop_type:" .shipspec/active-loop.local.md | sed 's/loop_type: *//')
+if [[ -f .shipspec/active-loop.local.json ]]; then
+  LOOP_TYPE=$(jq -r '.loop_type // empty' .shipspec/active-loop.local.json)
   if [[ "$LOOP_TYPE" == "task-loop" ]]; then
-    grep "^state_path:" .shipspec/active-loop.local.md | sed 's/state_path: *//'
+    jq -r '.state_path // empty' .shipspec/active-loop.local.json
   else
     echo "WRONG_LOOP_TYPE"
   fi
@@ -41,21 +40,28 @@ fi
 > Stop here.
 
 **If state_path found:**
-Read the state file:
+Check the state file exists:
 ```bash
-cat [state_path] 2>/dev/null || echo "NO_STATE_FILE"
+test -f [state_path] && echo "EXISTS" || echo "NO_STATE_FILE"
 ```
 
 **If NO_STATE_FILE:**
 Clean up stale pointer and report:
 ```bash
-rm -f .shipspec/active-loop.local.md
+rm -f .shipspec/active-loop.local.json
 ```
 > "No active task loop (stale pointer cleaned up). Run `/implement-task <feature> <task-id>` to start a task."
 > Stop here.
 
 **If found:**
-Parse the YAML frontmatter to extract:
+Parse the JSON state file to extract:
+```bash
+jq -r '.feature // empty' [state_path]
+jq -r '.task_id // empty' [state_path]
+jq -r '.iteration // 0' [state_path]
+jq -r '.max_iterations // 5' [state_path]
+```
+
 - `feature`: The feature directory name
 - `task_id`: The task being implemented
 - `iteration`: Current attempt number
@@ -65,9 +71,12 @@ Parse the YAML frontmatter to extract:
 
 ### Step 2: Load Task Prompt
 
-The task prompt is stored in the state file after the YAML frontmatter.
+The task prompt is stored in TASKS.json, not in the state file.
 
-Extract the full task prompt content (everything after the `---` closing the frontmatter).
+Read the prompt from TASKS.json:
+```bash
+jq -r --arg id "[task_id]" '.tasks[$id].prompt // empty' .shipspec/planning/[feature]/TASKS.json
+```
 
 ### Step 3: Run Verification
 
@@ -86,10 +95,10 @@ All acceptance criteria passed.
 
 1. Clean up state file:
    ```bash
-   rm -f [state_path] .shipspec/active-loop.local.md
+   rm -f [state_path] .shipspec/active-loop.local.json
    ```
 
-2. Update TASKS.md: Change `[~]` to `[x]` for the task
+2. Update TASKS.json: Use task-manager agent with `update_status` operation to set status to `completed`
 
 3. Log completion to `.claude/shipspec-debug.log`:
    ```
@@ -107,7 +116,7 @@ Some criteria failed. Manual intervention required.
 
 1. Clean up state file:
    ```bash
-   rm -f [state_path] .shipspec/active-loop.local.md
+   rm -f [state_path] .shipspec/active-loop.local.json
    ```
 
 2. Log the failure to `.claude/shipspec-debug.log`:
@@ -132,7 +141,7 @@ Cannot verify due to infrastructure issues.
 
 1. Clean up state file:
    ```bash
-   rm -f [state_path] .shipspec/active-loop.local.md
+   rm -f [state_path] .shipspec/active-loop.local.json
    ```
 
 2. Log to `.claude/shipspec-debug.log`:
@@ -152,3 +161,4 @@ Cannot verify due to infrastructure issues.
 3. **INCOMPLETE requires manual fix** - user must address issues and re-run `/implement-task`
 4. **BLOCKED needs investigation** - tasks that can't be verified need manual attention
 5. **State file cleanup** - always remove on any completion (VERIFIED, INCOMPLETE, or BLOCKED) to prevent stale loops
+6. **Prompts in TASKS.json** - the task prompt is read from TASKS.json, not stored in the state file

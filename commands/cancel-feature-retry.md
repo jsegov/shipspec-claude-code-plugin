@@ -3,8 +3,7 @@ description: Cancel active feature implementation retry loop
 allowed-tools:
   - Bash(test:*)
   - Bash(rm:*)
-  - Bash(grep:*)
-  - Bash(sed:*)
+  - Bash(jq:*)
   - Read
 ---
 
@@ -16,7 +15,7 @@ Cancel an active feature implementation retry loop.
 
 Check for the pointer file:
 ```bash
-test -f .shipspec/active-loop.local.md && echo "POINTER_EXISTS" || echo "NOT_FOUND"
+test -f .shipspec/active-loop.local.json && echo "POINTER_EXISTS" || echo "NOT_FOUND"
 ```
 
 **If NOT_FOUND:**
@@ -27,7 +26,7 @@ test -f .shipspec/active-loop.local.md && echo "POINTER_EXISTS" || echo "NOT_FOU
 **If POINTER_EXISTS:**
 Read the pointer file and verify it's a feature-retry:
 ```bash
-grep "^loop_type:" .shipspec/active-loop.local.md
+jq -r '.loop_type // empty' .shipspec/active-loop.local.json
 ```
 
 **If loop_type is NOT "feature-retry":**
@@ -39,15 +38,19 @@ grep "^loop_type:" .shipspec/active-loop.local.md
 
 Extract the state path from the pointer:
 ```bash
-grep "^state_path:" .shipspec/active-loop.local.md | sed 's/state_path: *//'
+jq -r '.state_path // empty' .shipspec/active-loop.local.json
 ```
 
-Read the state file using the extracted path:
-```
-Read [state_path]
+Parse the state file (JSON) to extract:
+```bash
+jq -r '.current_task_id // empty' [state_path]
+jq -r '.feature // empty' [state_path]
+jq -r '.task_attempt // 0' [state_path]
+jq -r '.max_task_attempts // 5' [state_path]
+jq -r '.tasks_completed // 0' [state_path]
+jq -r '.total_tasks // 0' [state_path]
 ```
 
-Extract from the YAML frontmatter:
 - `current_task_id` - the task being implemented
 - `feature` - the feature name
 - `task_attempt` - current attempt number for the task
@@ -60,7 +63,7 @@ Extract from the YAML frontmatter:
 Remove both the state file and pointer:
 
 ```bash
-rm -f [state_path] .shipspec/active-loop.local.md
+rm -f [state_path] .shipspec/active-loop.local.json
 ```
 
 ## Step 4: Report
@@ -70,5 +73,5 @@ rm -f [state_path] .shipspec/active-loop.local.md
 > - Current task: [CURRENT_TASK_ID] (attempt [TASK_ATTEMPT]/[MAX_TASK_ATTEMPTS])
 > - Progress: [TASKS_COMPLETED]/[TOTAL_TASKS] tasks completed
 >
-> The current task remains in `[~]` (in-progress) status in TASKS.md.
+> The current task remains in `in_progress` status in TASKS.json.
 > Run `/implement-feature [feature]` to resume, or `/implement-task [feature]` to continue task-by-task."

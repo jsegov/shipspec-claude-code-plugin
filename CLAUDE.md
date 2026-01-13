@@ -20,7 +20,7 @@ shipspec/
 │   ├── prd-gatherer.md        # Requirements elicitation
 │   ├── design-architect.md    # Technical design decisions
 │   ├── task-planner.md        # Task decomposition
-│   ├── task-manager.md        # Read-only TASKS.md parsing/validation
+│   ├── task-manager.md        # TASKS.json parsing/validation/status updates
 │   ├── task-verifier.md       # Acceptance criteria verification
 │   └── planning-validator.md  # PRD/SDD alignment checking
 ├── skills/             # Reusable skill templates (invoked via skill loader)
@@ -44,15 +44,60 @@ shipspec/
 ### Feature Planning (`/feature-planning`)
 7-phase workflow: Description → Setup → Requirements Gathering → PRD Generation → Technical Decisions → SDD Generation → Task Generation
 
-Output: `.shipspec/planning/{feature}/PRD.md`, `SDD.md`, `TASKS.md`
+Output:
+- `.shipspec/planning/{feature}/PRD.md` - Product requirements
+- `.shipspec/planning/{feature}/SDD.md` - Technical design
+- `.shipspec/planning/{feature}/TASKS.json` - Machine-parseable task metadata
+- `.shipspec/planning/{feature}/TASKS.md` - Human-readable task prompts
 
 ### Task Implementation (`/implement-task`, `/implement-feature`)
-1. Parse and validate TASKS.md via `task-manager` agent
-2. Find next ready task (dependencies satisfied)
-3. Mark task `[~]` (in-progress)
-4. Create loop state file for auto-retry
+1. Parse and validate TASKS.json via `task-manager` agent
+2. Find next ready task (dependencies satisfied, status = `not_started`)
+3. Update status to `in_progress` via task-manager `update_status` operation
+4. Create loop state file (JSON) for auto-retry
 5. Implement and verify via `task-verifier` agent
-6. Mark `[x]` on success, retry on failure
+6. Update status to `completed` on success, retry on failure
+
+## Task File Structure
+
+### TASKS.json (Machine-Parseable)
+```json
+{
+  "version": "1.0",
+  "feature": "feature-name",
+  "summary": {
+    "total_tasks": 5,
+    "total_points": 18,
+    "critical_path": ["TASK-001", "TASK-003", "TASK-005"]
+  },
+  "phases": [
+    { "id": 1, "name": "Foundation" }
+  ],
+  "tasks": {
+    "TASK-001": {
+      "title": "Setup Database Schema",
+      "status": "not_started",
+      "phase": 1,
+      "points": 3,
+      "depends_on": [],
+      "blocks": ["TASK-002"],
+      "prd_refs": ["REQ-001"],
+      "sdd_refs": ["Section 5.1"],
+      "acceptance_criteria": ["Schema file exists", "Migration runs"],
+      "testing": ["npm run db:migrate"],
+      "prompt": "## Context\n..."
+    }
+  }
+}
+```
+
+### TASKS.md (Human-Readable)
+Contains context, requirements prose, technical approach, files to create/modify, key interfaces, and constraints. No status markers or dependencies (those live in JSON).
+
+### Task Status Values
+- `"not_started"` - Task not yet begun
+- `"in_progress"` - Currently being implemented
+- `"completed"` - All acceptance criteria verified
 
 ## Ralph Loop Methodology
 
@@ -66,10 +111,11 @@ State files are stored alongside planning artifacts in `.shipspec/planning/<feat
 ## Hook Behavior
 
 All hooks share stdin sequentially. Each hook:
-1. Checks for pointer file (`.shipspec/active-loop.local.md`) first
-2. Parses pointer to check if this hook's loop type is active
+1. Checks for pointer file (`.shipspec/active-loop.local.json`) first
+2. Parses pointer JSON to check if this hook's loop type is active
 3. If not this hook's loop type, exits immediately (preserves stdin for other hooks)
-4. If active, reads the state file from `.shipspec/planning/<feature>/<loop-type>.local.md`
+4. If active, reads the state file from `.shipspec/planning/<feature>/<loop-type>.local.json`
+5. Reads task prompt from TASKS.json: `jq -r '.tasks[TASK_ID].prompt' TASKS.json`
 
 Empty stdin detection prevents erroneous state file deletion when multiple hooks are active.
 
@@ -81,33 +127,60 @@ Hooks expect JSON input with `transcript_path` field. Test with:
 echo '{"transcript_path": "/path/to/transcript.jsonl"}' | ./hooks/task-loop-hook.sh
 ```
 
-### Pointer File Format (`.shipspec/active-loop.local.md`)
-```yaml
----
-feature: feature-name
-loop_type: task-loop|feature-retry|planning-refine
-state_path: .shipspec/planning/feature-name/task-loop.local.md
-created_at: "2024-01-15T10:30:00Z"
----
+### Pointer File Format (`.shipspec/active-loop.local.json`)
+```json
+{
+  "feature": "feature-name",
+  "loop_type": "task-loop",
+  "state_path": ".shipspec/planning/feature-name/task-loop.local.json",
+  "created_at": "2024-01-15T10:30:00Z"
+}
 ```
 
-### State File Format (`.shipspec/planning/<feature>/<loop-type>.local.md`)
-```yaml
----
-active: true
-feature: feature-name
-task_id: TASK-001
-iteration: 1
-max_iterations: 5
----
+Supported loop types: `task-loop`, `feature-retry`, `planning-refine`
 
-[Full task prompt content here]
+### State File Format (`.shipspec/planning/<feature>/<loop-type>.local.json`)
+
+**task-loop.local.json:**
+```json
+{
+  "active": true,
+  "feature": "feature-name",
+  "task_id": "TASK-001",
+  "iteration": 1,
+  "max_iterations": 5,
+  "started_at": "2024-01-15T10:30:00Z"
+}
 ```
 
-### Task Status Markers
-- `[ ]` - Not started
-- `[~]` - In progress
-- `[x]` - Completed
+**feature-retry.local.json:**
+```json
+{
+  "active": true,
+  "feature": "feature-name",
+  "current_task_id": "TASK-001",
+  "task_attempt": 1,
+  "max_task_attempts": 5,
+  "tasks_completed": 0,
+  "total_tasks": 5,
+  "started_at": "2024-01-15T10:30:00Z"
+}
+```
+
+**planning-refine.local.json:**
+```json
+{
+  "active": true,
+  "feature": "feature-name",
+  "iteration": 1,
+  "max_iterations": 3,
+  "large_tasks": ["TASK-003", "TASK-007"],
+  "tasks_refined": 0,
+  "started_at": "2024-01-15T10:30:00Z"
+}
+```
+
+Note: Task prompts are read from TASKS.json, not stored in state files.
 
 ### Requirement Numbering
 - REQ-001 to REQ-009: Core Features
@@ -119,6 +192,22 @@ max_iterations: 5
 
 ### Task Sizing
 Fibonacci story points (1, 2, 3, 5, 8). Tasks >5 points trigger auto-refinement.
+
+### JSON Operations (jq)
+All hooks and commands use `jq` for JSON parsing:
+```bash
+# Read task status
+jq -r '.tasks["TASK-001"].status' TASKS.json
+
+# Update task status
+jq '.tasks["TASK-001"].status = "in_progress"' TASKS.json > tmp && mv tmp TASKS.json
+
+# Read prompt
+jq -r '.tasks["TASK-001"].prompt' TASKS.json
+
+# Increment iteration
+jq '.iteration += 1' state.json > tmp && mv tmp state.json
+```
 
 ### Version Bumping
 When updating the plugin version, update both files:

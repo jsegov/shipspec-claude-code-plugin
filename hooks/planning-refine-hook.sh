@@ -4,7 +4,7 @@
 
 set -euo pipefail
 
-POINTER_FILE=".shipspec/active-loop.local.md"
+POINTER_FILE=".shipspec/active-loop.local.json"
 EXPECTED_LOOP_TYPE="planning-refine"
 
 # Exit early if no pointer file - BEFORE consuming stdin
@@ -13,10 +13,10 @@ if [[ ! -f "$POINTER_FILE" ]]; then
   exit 0
 fi
 
-# Parse pointer file to get loop type and state path
-POINTER_FRONTMATTER=$(sed -n '/^---$/,/^---$/{ /^---$/d; p; }' "$POINTER_FILE")
-LOOP_TYPE=$(echo "$POINTER_FRONTMATTER" | grep '^loop_type:' | sed 's/loop_type: *//' || echo "")
-STATE_FILE=$(echo "$POINTER_FRONTMATTER" | grep '^state_path:' | sed 's/state_path: *//' || echo "")
+# Parse pointer file (JSON) to get loop type and state path
+LOOP_TYPE=$(jq -r '.loop_type // empty' "$POINTER_FILE" 2>/dev/null || echo "")
+STATE_FILE=$(jq -r '.state_path // empty' "$POINTER_FILE" 2>/dev/null || echo "")
+FEATURE=$(jq -r '.feature // empty' "$POINTER_FILE" 2>/dev/null || echo "")
 
 # Exit if this hook's loop type is not active
 if [[ "$LOOP_TYPE" != "$EXPECTED_LOOP_TYPE" ]]; then
@@ -42,16 +42,25 @@ fi
 
 TRANSCRIPT_PATH=$(echo "$INPUT" | jq -r '.transcript_path // empty')
 
-# Parse YAML frontmatter only (not prompt body)
-FRONTMATTER=$(sed -n '/^---$/,/^---$/{ /^---$/d; p; }' "$STATE_FILE")
+# Parse state file (JSON)
+ITERATION=$(jq -r '.iteration // 0' "$STATE_FILE" 2>/dev/null || echo "0")
+MAX_ITERATIONS=$(jq -r '.max_iterations // 3' "$STATE_FILE" 2>/dev/null || echo "3")
 
-# Extract fields from frontmatter
-ITERATION=$(echo "$FRONTMATTER" | grep '^iteration:' | sed 's/iteration: *//' || echo "")
-MAX_ITERATIONS=$(echo "$FRONTMATTER" | grep '^max_iterations:' | sed 's/max_iterations: *//' || echo "")
-FEATURE=$(echo "$FRONTMATTER" | grep '^feature:' | sed 's/feature: *//' || echo "")
+# Build refinement prompt from state - for planning-refine, we use a static prompt
+# since the refinement instructions are in the state file
+PROMPT_TEXT="Continue refining large tasks in \`.shipspec/planning/$FEATURE/TASKS.json\`.
 
-# Extract prompt (everything after the closing ---)
-PROMPT_TEXT=$(awk '/^---$/{if(i<2){i++; next}} i>=2' "$STATE_FILE")
+### Instructions:
+1. Read TASKS.json and identify tasks with story points > 5
+2. For each large task, break it into 2-3 smaller subtasks (each ≤3 story points)
+3. Update TASKS.json with the new subtasks
+4. Update TASKS.md to reflect the changes
+5. Preserve acceptance criteria across subtasks
+6. Update dependencies pointing to the original task
+
+### Completion:
+When all tasks are ≤5 story points, output:
+\`<planning-refine-complete>\`"
 
 # Validate numeric fields
 if [[ ! "$ITERATION" =~ ^[0-9]+$ ]]; then
@@ -67,21 +76,6 @@ if [[ ! "$MAX_ITERATIONS" =~ ^[0-9]+$ ]]; then
   echo "⚠️ Planning refine: State file corrupted" >&2
   echo "   File: $STATE_FILE" >&2
   echo "   Problem: 'max_iterations' field is not a valid number (got: '$MAX_ITERATIONS')" >&2
-  echo "   Delete the file manually to cancel: rm $STATE_FILE" >&2
-  rm -f "$STATE_FILE" "$POINTER_FILE"
-  exit 0
-fi
-
-# Validate prompt text exists
-if [[ -z "$PROMPT_TEXT" ]]; then
-  echo "⚠️ Planning refine: State file corrupted or incomplete" >&2
-  echo "   File: $STATE_FILE" >&2
-  echo "   Problem: No prompt text found after frontmatter" >&2
-  echo "" >&2
-  echo "   This usually means:" >&2
-  echo "     - State file was manually edited" >&2
-  echo "     - File was corrupted during writing" >&2
-  echo "" >&2
   echo "   Delete the file manually to cancel: rm $STATE_FILE" >&2
   rm -f "$STATE_FILE" "$POINTER_FILE"
   exit 0
@@ -137,11 +131,9 @@ if [[ $MAX_ITERATIONS -gt 0 ]] && [[ $ITERATION -ge $MAX_ITERATIONS ]]; then
   exit 0
 fi
 
-# Increment iteration
+# Increment iteration in state file (JSON)
 NEXT_ITER=$((ITERATION + 1))
-TEMP_FILE="${STATE_FILE}.tmp.$$"
-sed "s/^iteration: .*/iteration: $NEXT_ITER/" "$STATE_FILE" > "$TEMP_FILE"
-mv "$TEMP_FILE" "$STATE_FILE"
+jq --argjson iter "$NEXT_ITER" '.iteration = $iter' "$STATE_FILE" > "${STATE_FILE}.tmp" && mv "${STATE_FILE}.tmp" "$STATE_FILE"
 
 # Build system message
 MAX_DISPLAY="$MAX_ITERATIONS"
@@ -153,9 +145,9 @@ SYSTEM_MSG="🔄 **Task Refinement: Iteration $NEXT_ITER/$MAX_DISPLAY**
 
 **Feature:** $FEATURE
 
-Continue refining large tasks. Check TASKS.md for any tasks still > 5 story points."
+Continue refining large tasks. Check TASKS.json for any tasks still > 5 story points."
 
-# Return block decision - feed original prompt back for another attempt
+# Return block decision - feed refinement prompt back for another attempt
 jq -n \
   --arg prompt "$PROMPT_TEXT" \
   --arg msg "$SYSTEM_MSG" \

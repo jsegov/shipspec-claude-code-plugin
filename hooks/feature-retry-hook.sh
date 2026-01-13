@@ -4,7 +4,7 @@
 
 set -euo pipefail
 
-POINTER_FILE=".shipspec/active-loop.local.md"
+POINTER_FILE=".shipspec/active-loop.local.json"
 EXPECTED_LOOP_TYPE="feature-retry"
 
 # Exit early if no pointer file - BEFORE consuming stdin
@@ -13,10 +13,10 @@ if [[ ! -f "$POINTER_FILE" ]]; then
   exit 0
 fi
 
-# Parse pointer file to get loop type and state path
-POINTER_FRONTMATTER=$(sed -n '/^---$/,/^---$/{ /^---$/d; p; }' "$POINTER_FILE")
-LOOP_TYPE=$(echo "$POINTER_FRONTMATTER" | grep '^loop_type:' | sed 's/loop_type: *//' || echo "")
-STATE_FILE=$(echo "$POINTER_FRONTMATTER" | grep '^state_path:' | sed 's/state_path: *//' || echo "")
+# Parse pointer file (JSON) to get loop type and state path
+LOOP_TYPE=$(jq -r '.loop_type // empty' "$POINTER_FILE" 2>/dev/null || echo "")
+STATE_FILE=$(jq -r '.state_path // empty' "$POINTER_FILE" 2>/dev/null || echo "")
+FEATURE=$(jq -r '.feature // empty' "$POINTER_FILE" 2>/dev/null || echo "")
 
 # Exit if this hook's loop type is not active
 if [[ "$LOOP_TYPE" != "$EXPECTED_LOOP_TYPE" ]]; then
@@ -42,19 +42,20 @@ fi
 
 TRANSCRIPT_PATH=$(echo "$INPUT" | jq -r '.transcript_path // empty')
 
-# Parse YAML frontmatter only (not prompt body)
-FRONTMATTER=$(sed -n '/^---$/,/^---$/{ /^---$/d; p; }' "$STATE_FILE")
+# Parse state file (JSON)
+TASK_ATTEMPT=$(jq -r '.task_attempt // 0' "$STATE_FILE" 2>/dev/null || echo "0")
+MAX_ATTEMPTS=$(jq -r '.max_task_attempts // 5' "$STATE_FILE" 2>/dev/null || echo "5")
+TASK_ID=$(jq -r '.current_task_id // empty' "$STATE_FILE" 2>/dev/null || echo "")
+TASKS_COMPLETED=$(jq -r '.tasks_completed // 0' "$STATE_FILE" 2>/dev/null || echo "0")
+TOTAL_TASKS=$(jq -r '.total_tasks // 0' "$STATE_FILE" 2>/dev/null || echo "0")
 
-# Extract fields from frontmatter
-TASK_ATTEMPT=$(echo "$FRONTMATTER" | grep '^task_attempt:' | sed 's/task_attempt: *//' || echo "")
-MAX_ATTEMPTS=$(echo "$FRONTMATTER" | grep '^max_task_attempts:' | sed 's/max_task_attempts: *//' || echo "")
-FEATURE=$(echo "$FRONTMATTER" | grep '^feature:' | sed 's/feature: *//' || echo "")
-TASK_ID=$(echo "$FRONTMATTER" | grep '^current_task_id:' | sed 's/current_task_id: *//' || echo "")
-TASKS_COMPLETED=$(echo "$FRONTMATTER" | grep '^tasks_completed:' | sed 's/tasks_completed: *//' || echo "")
-TOTAL_TASKS=$(echo "$FRONTMATTER" | grep '^total_tasks:' | sed 's/total_tasks: *//' || echo "")
-
-# Extract prompt (everything after the closing ---)
-PROMPT_TEXT=$(awk '/^---$/{if(i<2){i++; next}} i>=2' "$STATE_FILE")
+# Get prompt from TASKS.json
+TASKS_FILE=".shipspec/planning/$FEATURE/TASKS.json"
+if [[ -f "$TASKS_FILE" ]]; then
+  PROMPT_TEXT=$(jq -r --arg id "$TASK_ID" '.tasks[$id].prompt // empty' "$TASKS_FILE" 2>/dev/null || echo "")
+else
+  PROMPT_TEXT=""
+fi
 
 # Validate numeric fields
 if [[ ! "$TASK_ATTEMPT" =~ ^[0-9]+$ ]]; then
@@ -77,15 +78,15 @@ fi
 
 # Validate prompt text exists
 if [[ -z "$PROMPT_TEXT" ]]; then
-  echo "⚠️ Feature retry: State file corrupted or incomplete" >&2
-  echo "   File: $STATE_FILE" >&2
-  echo "   Problem: No prompt text found after frontmatter" >&2
+  echo "⚠️ Feature retry: Could not retrieve task prompt" >&2
+  echo "   Task ID: $TASK_ID" >&2
+  echo "   TASKS.json: $TASKS_FILE" >&2
   echo "" >&2
   echo "   This usually means:" >&2
-  echo "     - State file was manually edited" >&2
-  echo "     - File was corrupted during writing" >&2
+  echo "     - TASKS.json was deleted or moved" >&2
+  echo "     - Task ID doesn't exist in TASKS.json" >&2
   echo "" >&2
-  echo "   Run /cancel-feature-retry or delete the file manually" >&2
+  echo "   Run /cancel-feature-retry or delete the state file manually" >&2
   rm -f "$STATE_FILE" "$POINTER_FILE"
   exit 0
 fi
@@ -153,11 +154,9 @@ if [[ $MAX_ATTEMPTS -gt 0 ]] && [[ $TASK_ATTEMPT -ge $MAX_ATTEMPTS ]]; then
   exit 0
 fi
 
-# Increment attempt
+# Increment attempt in state file (JSON)
 NEXT_ATTEMPT=$((TASK_ATTEMPT + 1))
-TEMP_FILE="${STATE_FILE}.tmp.$$"
-sed "s/^task_attempt: .*/task_attempt: $NEXT_ATTEMPT/" "$STATE_FILE" > "$TEMP_FILE"
-mv "$TEMP_FILE" "$STATE_FILE"
+jq --argjson attempt "$NEXT_ATTEMPT" '.task_attempt = $attempt' "$STATE_FILE" > "${STATE_FILE}.tmp" && mv "${STATE_FILE}.tmp" "$STATE_FILE"
 
 # Build context-aware system message
 MAX_DISPLAY="$MAX_ATTEMPTS"

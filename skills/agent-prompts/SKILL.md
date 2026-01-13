@@ -1,27 +1,159 @@
 ---
 name: agent-prompts
 description: This skill should be used when the user asks to "generate tasks", "create implementation plan", "break down feature", "write agent prompts", "decompose into tasks", "create work items", or when creating agent-ready task descriptions from PRD and SDD documents.
-version: 0.1.0
+version: 0.2.0
 ---
 
 # Agent Prompt Generation
 
 Create structured task prompts that coding agents can execute effectively.
 
-## Task Prompt Template
+## Output Files
 
-Each task should include this structure. Note the checkbox format `- [ ]` in the header for status tracking:
+Task generation produces two files:
+
+| File | Purpose | Used By |
+|------|---------|---------|
+| `TASKS.json` | Machine-parseable metadata | Plugin agents, hooks, commands |
+| `TASKS.md` | Human-readable task prompts | Developers, code review |
+
+**Source of Truth**: TASKS.json is authoritative. TASKS.md is a derived human-readable view.
+
+## TASKS.json Structure
+
+```json
+{
+  "version": "1.0",
+  "feature": "feature-name",
+  "summary": {
+    "total_tasks": 5,
+    "total_points": 18,
+    "critical_path": ["TASK-001", "TASK-003", "TASK-005"]
+  },
+  "phases": [
+    { "id": 1, "name": "Foundation" },
+    { "id": 2, "name": "Core Implementation" },
+    { "id": 3, "name": "Polish" }
+  ],
+  "tasks": {
+    "TASK-001": {
+      "title": "Setup Database Schema",
+      "status": "not_started",
+      "phase": 1,
+      "points": 3,
+      "depends_on": [],
+      "blocks": ["TASK-002", "TASK-003"],
+      "prd_refs": ["REQ-001", "REQ-002"],
+      "sdd_refs": ["Section 5.1"],
+      "acceptance_criteria": [
+        "Schema file exists at db/schema.sql",
+        "All tables have primary keys",
+        "Foreign key relationships match SDD",
+        "Migration runs without errors"
+      ],
+      "testing": [
+        "Run migration: npm run db:migrate",
+        "Verify tables: npm run db:verify"
+      ],
+      "prompt": "## Context\nThis task establishes the data layer...\n\n## Requirements\n- Create users table with id, email, created_at\n..."
+    }
+  }
+}
+```
+
+### Task Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `title` | string | Clear, action-oriented task title |
+| `status` | enum | `"not_started"` \| `"in_progress"` \| `"completed"` |
+| `phase` | integer | Phase number (1-indexed) |
+| `points` | integer | Fibonacci story points: 1, 2, 3, 5, 8 |
+| `depends_on` | array | Task IDs that must complete first |
+| `blocks` | array | Task IDs that depend on this task |
+| `prd_refs` | array | Requirement IDs (REQ-XXX) this task addresses |
+| `sdd_refs` | array | SDD section references |
+| `acceptance_criteria` | array | Verifiable criteria for completion |
+| `testing` | array | Test commands or verification steps |
+| `prompt` | string | Full markdown prompt for implementation |
+
+## TASKS.md Structure
+
+The markdown file contains human-readable content only. No status markers, dependencies, or acceptance criteria (those live in JSON).
 
 ```markdown
-### - [ ] TASK-XXX: [Clear, Action-Oriented Title]
+# Implementation Tasks: [Feature Name]
 
+## Summary
+
+- Total Tasks: 5
+- Total Story Points: 18
+- Critical Path: TASK-001 → TASK-003 → TASK-005
+
+## Requirement Coverage
+
+| Requirement | Task(s) |
+|-------------|---------|
+| REQ-001 | TASK-001, TASK-003 |
+| REQ-002 | TASK-002, TASK-004 |
+
+---
+
+## Phase 1: Foundation
+
+### TASK-001: Setup Database Schema
+
+#### Context
+This task establishes the data layer for the feature. The schema must support
+all entities defined in the SDD and enable the API operations in Phase 2.
+
+#### Requirements
+- Create users table with id, email, created_at
+- Create sessions table with foreign key to users
+- Add indexes for common query patterns
+
+#### Technical Approach
+Follow the existing migration pattern in `db/migrations/`. Use the same
+column naming conventions as existing tables.
+
+#### Files to Create/Modify
+- `db/migrations/002_add_users.sql` - New migration file
+- `db/schema.sql` - Update schema documentation
+
+#### Key Interfaces
+```sql
+CREATE TABLE users (
+  id SERIAL PRIMARY KEY,
+  email VARCHAR(255) UNIQUE NOT NULL,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+#### Constraints
+- Follow existing naming conventions (snake_case)
+- Use SERIAL for auto-increment IDs
+- All timestamps must include timezone
+
+---
+
+## Phase 2: Core Implementation
+
+### TASK-002: Create API Endpoints
+...
+```
+
+## Task Prompt Template
+
+Each task's `prompt` field should follow this structure:
+
+```markdown
 ## Context
 [2-3 sentences explaining where this task fits in the larger system and why it matters]
 
 ## Requirements
-- [ ] [Specific, verifiable requirement 1]
-- [ ] [Specific, verifiable requirement 2]
-- [ ] [Specific, verifiable requirement 3]
+- [Specific, verifiable requirement 1]
+- [Specific, verifiable requirement 2]
+- [Specific, verifiable requirement 3]
 
 ## Technical Approach
 
@@ -49,47 +181,21 @@ interface ExpectedOutput {
 - Use `[specific library]` for `[purpose]`
 - Do not modify `[protected area]`
 - Maintain backward compatibility with `[existing API]`
-
-## Testing Requirements
-- Unit test: [What to test, expected coverage]
-- Integration test: [End-to-end scenario to verify]
-- Edge cases: [Specific edge cases to handle]
-
-## Acceptance Criteria
-- [ ] [Criterion 1 - must be verifiable]
-- [ ] [Criterion 2 - must be verifiable]
-- [ ] All tests pass
-- [ ] No type errors (if applicable)
-- [ ] Linting passes (if configured)
-
-## Dependencies
-- Depends on: [TASK-XXX] (must complete first)
-- Blocks: [TASK-YYY] (cannot start until this completes)
-
-## References
-- Design Doc: Section X.Y
-- PRD: REQ-XXX, REQ-YYY
-- Similar implementation: `path/to/similar/code`
-
-## Estimated Effort
-- Story Points: [1/2/3/5/8]
 ```
 
 ## Task Sizing Guidelines
 
-| Points | Description | Duration | Example |
-|--------|-------------|----------|---------|
-| 1 | Trivial change | < 2 hours | Config update, copy change |
-| 2 | Small task | 2-4 hours | Single function, simple component |
-| 3 | Medium task | 4-8 hours | Multiple functions, moderate complexity |
-| 5 | Large task | 1-2 days | Significant feature piece |
-| 8 | Complex task | 2-3 days | Cross-cutting, multiple systems |
+| Points | Description | Example |
+|--------|-------------|---------|
+| 1 | Trivial change | Config update, copy change |
+| 2 | Small task | Single function, simple component |
+| 3 | Medium task | Multiple functions, moderate complexity |
+| 5 | Large task | Significant feature piece |
+| 8 | Complex task | Cross-cutting, multiple systems |
 
-**Rule:** If a task would be larger than 8 points, break it down.
+**Rule:** Tasks >5 points trigger auto-refinement. Tasks >8 points must be broken down.
 
 ## Task Categories
-
-Assign each task to exactly one category:
 
 | Category | Description | Examples |
 |----------|-------------|----------|
@@ -104,7 +210,7 @@ Assign each task to exactly one category:
 
 When generating tasks, identify:
 
-1. **Hard Dependencies (Blocks)**
+1. **Hard Dependencies (depends_on/blocks)**
    - Task X must complete before Task Y can start
    - Usually: schema → API → UI
 
@@ -114,99 +220,49 @@ When generating tasks, identify:
 
 3. **Critical Path**
    - The longest chain of dependent tasks
-   - Determines minimum project duration
-
-## Task Status Tracking
-
-Tasks use checkbox format in the header for status tracking:
-
-| Status | Format | Meaning |
-|--------|--------|---------|
-| Not Started | `### - [ ] TASK-XXX:` | Ready to implement |
-| In Progress | `### - [~] TASK-XXX:` | Currently being worked on |
-| Completed | `### - [x] TASK-XXX:` | Done and verified |
+   - Store in `summary.critical_path`
 
 ## Execution Phases
 
 Group tasks into logical phases:
 
-```markdown
-### Phase 1: Foundation
-- [ ] TASK-001: Database schema
-- [ ] TASK-002: Base types and interfaces
-[These must complete first]
-
-### Phase 2: Core Implementation
-- [ ] TASK-003: API endpoints (depends on 001, 002)
-- [ ] TASK-004: Service layer (depends on 001, 002)
-[Can be parallelized]
-
-### Phase 3: UI Layer
-- [ ] TASK-005: Components (depends on 003)
-- [ ] TASK-006: Pages (depends on 005)
-
-### Phase 4: Polish
-- [ ] TASK-007: Tests (depends on 003, 004, 005)
-- [ ] TASK-008: Documentation (depends on all)
-```
-
-## Output Format for Task List
-
-When generating a complete task list:
-
-```markdown
-# Implementation Tasks: [Feature Name]
-
-## Summary
-- Total Tasks: X
-- Total Story Points: Y
-- Estimated Duration: Z sessions
-- Critical Path: TASK-001 → TASK-003 → TASK-005
-
-## Requirement Coverage
-| Requirement | Task(s) |
-|-------------|---------|
-| REQ-001 | TASK-001, TASK-003 |
-| REQ-002 | TASK-002, TASK-004 |
-
-## Phase 1: [Phase Name]
-
-### - [ ] TASK-001: [Title]
-[Full task prompt...]
-
-### - [ ] TASK-002: [Title]
-[Full task prompt...]
-
-## Phase 2: [Phase Name]
-
-### - [ ] TASK-003: [Title]
-[Full task prompt...]
-```
+| Phase | Purpose | Typical Tasks |
+|-------|---------|---------------|
+| 1: Foundation | Setup and infrastructure | Schema, types, config |
+| 2: Core | Main implementation | APIs, services, core logic |
+| 3: UI | User interface | Components, pages, forms |
+| 4: Polish | Quality and docs | Tests, documentation, cleanup |
 
 ## Quality Checklist
 
 Before finalizing tasks:
 
-- [ ] Every task has clear acceptance criteria
+- [ ] Every task has clear acceptance criteria in JSON
 - [ ] Dependencies form a valid DAG (no cycles)
 - [ ] No task exceeds 8 story points
 - [ ] Every requirement (REQ-XXX) maps to at least one task
 - [ ] Tests are included as explicit tasks
 - [ ] File paths reference actual codebase structure
+- [ ] `prompt` field contains full implementation guidance
 
 ## Typical Decomposition Pattern
 
 ```
 Feature X
-├── - [ ] TASK-001: Database schema/migrations (infrastructure)
-├── - [ ] TASK-002: Type definitions and interfaces (infrastructure)
-├── - [ ] TASK-003: API endpoint - create (feature)
-├── - [ ] TASK-004: API endpoint - read (feature)
-├── - [ ] TASK-005: API endpoint - update (feature)
-├── - [ ] TASK-006: API endpoint - delete (feature)
-├── - [ ] TASK-007: UI component - form (feature)
-├── - [ ] TASK-008: UI component - list (feature)
-├── - [ ] TASK-009: Unit tests (testing)
-├── - [ ] TASK-010: Integration tests (testing)
-└── - [ ] TASK-011: Documentation (documentation)
+├── TASK-001: Database schema/migrations (infrastructure, 3pts)
+├── TASK-002: Type definitions and interfaces (infrastructure, 2pts)
+├── TASK-003: API endpoint - create (feature, 3pts)
+├── TASK-004: API endpoint - read (feature, 2pts)
+├── TASK-005: API endpoint - update (feature, 3pts)
+├── TASK-006: API endpoint - delete (feature, 2pts)
+├── TASK-007: UI component - form (feature, 3pts)
+├── TASK-008: UI component - list (feature, 3pts)
+├── TASK-009: Unit tests (testing, 3pts)
+├── TASK-010: Integration tests (testing, 3pts)
+└── TASK-011: Documentation (documentation, 2pts)
 ```
+
+## Schema Reference
+
+See `references/tasks-schema.json` for the full JSON Schema specification.
+See `references/state-schemas.json` for loop state file schemas.
