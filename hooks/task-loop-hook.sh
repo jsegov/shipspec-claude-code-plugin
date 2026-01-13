@@ -26,7 +26,7 @@ FEATURE=$(echo "$FRONTMATTER" | grep '^feature:' | sed 's/feature: *//' || echo 
 TASK_ID=$(echo "$FRONTMATTER" | grep '^task_id:' | sed 's/task_id: *//' || echo "")
 
 # Extract prompt (everything after the closing ---)
-PROMPT_TEXT=$(awk '/^---$/{i++; next} i>=2' "$STATE_FILE")
+PROMPT_TEXT=$(awk '/^---$/{if(i<2){i++; next}} i>=2' "$STATE_FILE")
 
 # Validate numeric fields
 if [[ ! "$ITERATION" =~ ^[0-9]+$ ]]; then

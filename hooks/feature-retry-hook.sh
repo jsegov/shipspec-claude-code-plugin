@@ -28,7 +28,7 @@ TASKS_COMPLETED=$(echo "$FRONTMATTER" | grep '^tasks_completed:' | sed 's/tasks_
 TOTAL_TASKS=$(echo "$FRONTMATTER" | grep '^total_tasks:' | sed 's/total_tasks: *//' || echo "")
 
 # Extract prompt (everything after the closing ---)
-PROMPT_TEXT=$(awk '/^---$/{i++; next} i>=2' "$STATE_FILE")
+PROMPT_TEXT=$(awk '/^---$/{if(i<2){i++; next}} i>=2' "$STATE_FILE")
 
 # Validate numeric fields
 if [[ ! "$TASK_ATTEMPT" =~ ^[0-9]+$ ]]; then
