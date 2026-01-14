@@ -1,0 +1,165 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://shipspec.dev/schemas/tasks.json",
+  "title": "TASKS.json Schema",
+  "description": "Machine-parseable task metadata for ShipSpec feature implementation",
+  "type": "object",
+  "required": ["version", "feature", "summary", "phases", "tasks"],
+  "properties": {
+    "version": {
+      "type": "string",
+      "description": "Schema version for forward compatibility",
+      "const": "1.0"
+    },
+    "feature": {
+      "type": "string",
+      "description": "Feature name (kebab-case)",
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+    },
+    "summary": {
+      "type": "object",
+      "required": ["total_tasks", "total_points", "critical_path"],
+      "properties": {
+        "total_tasks": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Total number of tasks"
+        },
+        "total_points": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Sum of all story points"
+        },
+        "critical_path": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^TASK-[0-9]{3}$"
+          },
+          "description": "Longest dependency chain determining minimum duration"
+        }
+      }
+    },
+    "phases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "name"],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "description": "Logical groupings of tasks"
+    },
+    "tasks": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/task"
+      },
+      "propertyNames": {
+        "pattern": "^TASK-[0-9]{3}$"
+      },
+      "description": "Map of task ID to task metadata"
+    }
+  },
+  "$defs": {
+    "task": {
+      "type": "object",
+      "required": [
+        "title",
+        "status",
+        "phase",
+        "points",
+        "depends_on",
+        "blocks",
+        "prd_refs",
+        "sdd_refs",
+        "acceptance_criteria",
+        "testing",
+        "prompt"
+      ],
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Clear, action-oriented task title"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["not_started", "in_progress", "completed"],
+          "description": "Current task status"
+        },
+        "phase": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Phase number this task belongs to"
+        },
+        "points": {
+          "type": "integer",
+          "enum": [1, 2, 3, 5, 8],
+          "description": "Fibonacci story points (tasks >5 trigger auto-refinement)"
+        },
+        "depends_on": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^TASK-[0-9]{3}$"
+          },
+          "description": "Task IDs that must complete before this task can start"
+        },
+        "blocks": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^TASK-[0-9]{3}$"
+          },
+          "description": "Task IDs that cannot start until this task completes"
+        },
+        "prd_refs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^REQ-[0-9]{3}$"
+          },
+          "description": "Requirement IDs from PRD this task addresses"
+        },
+        "sdd_refs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "SDD section references (e.g., 'Section 5.1')"
+        },
+        "acceptance_criteria": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "Verifiable criteria for task completion"
+        },
+        "testing": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Test commands or verification steps"
+        },
+        "prompt": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Full task prompt markdown (Context, Requirements, Technical Approach, etc.)"
+        }
+      }
+    }
+  }
+}

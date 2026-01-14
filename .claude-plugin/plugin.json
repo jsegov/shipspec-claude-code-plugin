@@ -1,7 +1,7 @@
 {
   "name": "shipspec",
   "description": "Spec-driven development for big features. When features get too big, plan mode gets too vague—leading to hallucinations during implementation. ShipSpec replaces vague plans with structured PRDs, technical designs, and ordered tasks that keep Claude grounded.",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "author": {
     "name": "ShipSpec"
   },

@@ -1,7 +1,7 @@
 ---
-description: Implement a specific task or the next available task from TASKS.md
+description: Implement a specific task or the next available task from TASKS.json
 argument-hint: <feature-dir> [task-id]
-allowed-tools: Read, Glob, Grep, Write, Edit, Bash(cat:*), Bash(ls:*), Bash(find:*), Bash(git:*), Bash(head:*), Bash(wc:*), Bash(npm:*), Bash(npx:*), Bash(yarn:*), Bash(pnpm:*), Bash(bun:*), Bash(cargo:*), Bash(make:*), Bash(pytest:*), Bash(go:*), Bash(mypy:*), Bash(ruff:*), Bash(flake8:*), Bash(golangci-lint:*), Task
+allowed-tools: Read, Glob, Grep, Write, Edit, Bash(cat:*), Bash(ls:*), Bash(find:*), Bash(git:*), Bash(head:*), Bash(wc:*), Bash(npm:*), Bash(npx:*), Bash(yarn:*), Bash(pnpm:*), Bash(bun:*), Bash(cargo:*), Bash(make:*), Bash(pytest:*), Bash(go:*), Bash(mypy:*), Bash(ruff:*), Bash(flake8:*), Bash(golangci-lint:*), Bash(rm:*), Bash(mkdir:*), Bash(jq:*), Task
 ---
 
 # Implement Task: $ARGUMENTS
@@ -49,13 +49,13 @@ ls -d .shipspec/planning/[feature-dir] 2>/dev/null || echo "NOT_FOUND"
 >
 > Please run `/feature-planning` first to create the planning artifacts."
 
-**Check for TASKS.md:**
+**Check for TASKS.json:**
 ```bash
-ls -la .shipspec/planning/[feature-dir]/TASKS.md 2>/dev/null || echo "TASKS.md NOT FOUND"
+ls -la .shipspec/planning/[feature-dir]/TASKS.json 2>/dev/null || echo "TASKS.json NOT FOUND"
 ```
 
-**If TASKS.md not found:**
-> "No TASKS.md found in `.shipspec/planning/[feature-dir]/`.
+**If TASKS.json not found:**
+> "No TASKS.json found in `.shipspec/planning/[feature-dir]/`.
 >
 > Run `/feature-planning` to complete the planning workflow and generate tasks."
 
@@ -65,7 +65,7 @@ Delegate to the `task-manager` agent with:
 - Feature name: [feature-dir]
 - Operation: `parse`
 
-**If error (TASKS.md not found or empty):**
+**If error (TASKS.json not found or empty):**
 Show the error message from task-manager and stop.
 
 **If successful:**
@@ -137,23 +137,39 @@ Tell the user:
 - Task ID: [the in-progress task ID]
 
 Delegate to the `task-verifier` subagent with:
-- The full task prompt for the in-progress task
+- The task ID
 - The feature directory name
+- The full task prompt for context
 
 **Based on verification result:**
+
+**Log verification result** to `.claude/shipspec-debug.log`:
+```
+$(date -u +%Y-%m-%dT%H:%M:%SZ) | [task-id] | VERIFY | [VERIFIED|INCOMPLETE|BLOCKED] | [brief failure reason if any]
+```
 
 - **VERIFIED**:
   - Continue to Step 4.5 to validate planning alignment (if task has references)
 
 - **INCOMPLETE**:
-  - Keep the task as `[~]`
+  - Keep the task status as `in_progress` (no status update needed)
   - Show the user what's missing
+  - **Clean up loop state and output incomplete marker:**
+    ```bash
+    rm -f .shipspec/planning/[feature-dir]/task-loop.local.json .shipspec/active-loop.local.json
+    ```
+    Then output: `<task-loop-complete>INCOMPLETE</task-loop-complete>`
   - Tell user: "Task [TASK-ID] is not complete. Please address the issues above, then run this command again."
   - **Stop here** - don't proceed to next task
 
 - **BLOCKED**:
-  - Keep the task as `[~]`
+  - Keep the task status as `in_progress`
   - Show the blocking reason
+  - **Clean up loop state and output blocked marker:**
+    ```bash
+    rm -f .shipspec/planning/[feature-dir]/task-loop.local.json .shipspec/active-loop.local.json
+    ```
+    Then output: `<task-loop-complete>BLOCKED</task-loop-complete>`
   - Ask user how they want to proceed
 
 **If NONE:**
@@ -163,41 +179,79 @@ Continue to Step 5.
 
 **This step runs after task-verifier returns VERIFIED.**
 
-Check if the task has a `## References` section containing SDD or PRD references.
+Check if the task has `prd_refs` or `sdd_refs` arrays in TASKS.json:
 
-**If the task has SDD or PRD references:**
+```bash
+jq -r '.tasks["[task-id]"] | (.prd_refs | length), (.sdd_refs | length)' .shipspec/planning/[feature-dir]/TASKS.json
+```
+
+**If the task has any PRD or SDD references (either array is non-empty):**
 
 1. Tell user: "Acceptance criteria verified. Checking planning alignment..."
 
 2. Delegate to the `planning-validator` agent with:
    - The task ID
    - The feature directory name
-   - The task's References section
 
 3. **Based on validation result:**
 
    **If ALIGNED:**
    - Tell user: "Planning alignment verified."
-   - Update task status from `[~]` to `[x]` in TASKS.md
+   - Update task status to `completed`:
+     - Delegate to `task-manager` with operation `update_status`, task ID, and new status `completed`
+   - **Log task completion** to `.claude/shipspec-debug.log`:
+     ```
+     $(date -u +%Y-%m-%dT%H:%M:%SZ) | [task-id] | COMPLETE | Status updated to completed
+     ```
+   - **Clean up loop state and output completion marker:**
+     ```bash
+     rm -f .shipspec/planning/[feature-dir]/task-loop.local.json .shipspec/active-loop.local.json
+     ```
+     Then output: `<task-loop-complete>VERIFIED</task-loop-complete>`
    - Tell user: "Task [TASK-ID] complete! Moving to next task..."
    - If task-id was specified and matches: **Stop here** - the requested task is complete
    - Otherwise: Continue to Step 5
 
    **If MISALIGNED:**
    - Show specific misalignment issues
+   - **Clean up loop state and output misaligned marker:**
+     ```bash
+     rm -f .shipspec/planning/[feature-dir]/task-loop.local.json .shipspec/active-loop.local.json
+     ```
+     Then output: `<task-loop-complete>MISALIGNED</task-loop-complete>`
    - Tell user: "Implementation doesn't match design/requirements. Please fix the issues above."
-   - Keep task as `[~]`, **stop here**
+   - Keep task as `in_progress`, **stop here**
 
    **If UNVERIFIED:**
    - Show missing references
-   - Tell user: "Warning: Some planning references could not be verified. Consider updating references in TASKS.md or planning documents."
-   - Update task status from `[~]` to `[x]` in TASKS.md (warning only, not blocking)
+   - Tell user: "Warning: Some planning references could not be verified. Consider updating references in TASKS.json or planning documents."
+   - Update task status to `completed`:
+     - Delegate to `task-manager` with operation `update_status`, task ID, and new status `completed`
+   - **Log task completion** to `.claude/shipspec-debug.log`:
+     ```
+     $(date -u +%Y-%m-%dT%H:%M:%SZ) | [task-id] | COMPLETE | Status updated to completed (with warnings)
+     ```
+   - **Clean up loop state and output completion marker:**
+     ```bash
+     rm -f .shipspec/planning/[feature-dir]/task-loop.local.json .shipspec/active-loop.local.json
+     ```
+     Then output: `<task-loop-complete>VERIFIED</task-loop-complete>`
    - Tell user: "Task [TASK-ID] complete with warnings. Moving to next task..."
    - If task-id was specified and matches: **Stop here**
    - Otherwise: Continue to Step 5
 
-**If the task has NO References section:**
-- Update task status from `[~]` to `[x]` in TASKS.md
+**If the task has NO references (both arrays are empty):**
+- Update task status to `completed`:
+  - Delegate to `task-manager` with operation `update_status`, task ID, and new status `completed`
+- **Log task completion** to `.claude/shipspec-debug.log`:
+  ```
+  $(date -u +%Y-%m-%dT%H:%M:%SZ) | [task-id] | COMPLETE | Status updated to completed
+  ```
+- **Clean up loop state and output completion marker:**
+  ```bash
+  rm -f .shipspec/planning/[feature-dir]/task-loop.local.json .shipspec/active-loop.local.json
+  ```
+  Then output: `<task-loop-complete>VERIFIED</task-loop-complete>`
 - Tell user: "Task [TASK-ID] verified complete! Moving to next task..."
 - If task-id was specified and matches: **Stop here**
 - Otherwise: Continue to Step 5
@@ -223,15 +277,20 @@ Delegate to the `task-manager` agent with:
 
 Once a target task is identified:
 
-1. **Update TASKS.md**: Change the task's status from `[ ]` to `[~]`
-   - Find `### - [ ] TASK-XXX:` -> Replace with `### - [~] TASK-XXX:`
+1. **Update task status** to `in_progress`:
+   - Delegate to `task-manager` with operation `update_status`, task ID, and new status `in_progress`
 
-2. **Get full task prompt** by delegating to `task-manager` with:
+2. **Log task start** to `.claude/shipspec-debug.log`:
+   ```
+   $(date -u +%Y-%m-%dT%H:%M:%SZ) | [task-id] | START | Implementing: [title]
+   ```
+
+3. **Get full task prompt** by delegating to `task-manager` with:
    - Feature name: [feature-dir]
    - Operation: `get_task`
    - Task ID: [the target task ID]
 
-3. **Display to user**:
+4. **Display to user**:
 
 > "## Starting Task: [TASK-ID]
 >
@@ -251,6 +310,48 @@ Once a target task is identified:
 > /implement-task [feature-dir]
 > ```
 > This will verify your work and move to the next task."
+
+## Step 6.5: Initialize Loop State
+
+After starting the task, create the loop state files for automatic retry:
+
+**Create pointer file (JSON format):**
+```bash
+cat > .shipspec/active-loop.local.json << 'EOF'
+{
+  "feature": "[feature-dir]",
+  "loop_type": "task-loop",
+  "state_path": ".shipspec/planning/[feature-dir]/task-loop.local.json",
+  "created_at": "[ISO timestamp]"
+}
+EOF
+```
+
+**Create state file in feature directory (JSON format):**
+```bash
+cat > .shipspec/planning/[feature-dir]/task-loop.local.json << 'EOF'
+{
+  "active": true,
+  "feature": "[feature-dir]",
+  "task_id": "[task-id]",
+  "iteration": 1,
+  "max_iterations": 5,
+  "started_at": "[ISO timestamp]"
+}
+EOF
+```
+
+**Note:** The full task prompt is stored in TASKS.json's `tasks[task-id].prompt` field and can be retrieved by the hook using jq.
+
+**Log loop start** to `.claude/shipspec-debug.log`:
+```
+$(date -u +%Y-%m-%dT%H:%M:%SZ) | [task-id] | LOOP_START | Attempt 1/5
+```
+
+**The stop hook will automatically:**
+- Retry if verification fails (up to 5 attempts)
+- Exit cleanly when `<task-loop-complete>VERIFIED</task-loop-complete>` is output
+- Exit cleanly when `<task-loop-complete>BLOCKED</task-loop-complete>` is output
 
 ## Step 7: Summary
 
@@ -278,4 +379,4 @@ If task-id doesn't match expected formats:
 > - Full ID: `TASK-003`"
 
 ### Empty Dependencies Field
-If a task has `Depends on: None` or no dependencies section, treat it as having no dependencies (ready if status is `[ ]`).
+If a task has empty `depends_on` array, treat it as having no dependencies (ready if status is `not_started`).

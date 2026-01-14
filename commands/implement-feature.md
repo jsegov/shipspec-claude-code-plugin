@@ -1,12 +1,12 @@
 ---
 description: Implement all tasks for a feature end-to-end automatically
 argument-hint: <feature-name>
-allowed-tools: Read, Glob, Grep, Write, Edit, Bash(cat:*), Bash(ls:*), Bash(find:*), Bash(git:*), Bash(head:*), Bash(wc:*), Bash(npm:*), Bash(npx:*), Bash(yarn:*), Bash(pnpm:*), Bash(bun:*), Bash(cargo:*), Bash(make:*), Bash(pytest:*), Bash(go:*), Bash(mypy:*), Bash(ruff:*), Bash(flake8:*), Bash(golangci-lint:*), Task, AskUserQuestion
+allowed-tools: Read, Glob, Grep, Write, Edit, Bash(cat:*), Bash(ls:*), Bash(find:*), Bash(git:*), Bash(head:*), Bash(wc:*), Bash(npm:*), Bash(npx:*), Bash(yarn:*), Bash(pnpm:*), Bash(bun:*), Bash(cargo:*), Bash(make:*), Bash(pytest:*), Bash(go:*), Bash(mypy:*), Bash(ruff:*), Bash(flake8:*), Bash(golangci-lint:*), Bash(rm:*), Bash(mkdir:*), Bash(jq:*), Task, AskUserQuestion
 ---
 
 # Implement Feature: $ARGUMENTS
 
-Automatically implement ALL tasks in a feature's TASKS.md file end-to-end. After all tasks are complete, run a comprehensive review against PRD, SDD, and all acceptance criteria.
+Automatically implement ALL tasks in a feature's TASKS.json file end-to-end. After all tasks are complete, run a comprehensive review against PRD, SDD, and all acceptance criteria.
 
 ## Step 0: Validate Argument
 
@@ -40,7 +40,7 @@ ls -d .shipspec/planning/$ARGUMENTS 2>/dev/null || echo "NOT_FOUND"
 **Check for required planning artifacts:**
 ```bash
 echo "=== Checking planning artifacts ==="
-ls .shipspec/planning/$ARGUMENTS/TASKS.md 2>/dev/null || echo "TASKS.md NOT FOUND"
+ls .shipspec/planning/$ARGUMENTS/TASKS.json 2>/dev/null || echo "TASKS.json NOT FOUND"
 ls .shipspec/planning/$ARGUMENTS/PRD.md 2>/dev/null || echo "PRD.md NOT FOUND"
 ls .shipspec/planning/$ARGUMENTS/SDD.md 2>/dev/null || echo "SDD.md NOT FOUND"
 ```
@@ -57,7 +57,7 @@ Delegate to the `task-manager` agent with:
 - Feature name: $ARGUMENTS
 - Operation: `parse`
 
-**If error (TASKS.md not found or empty):**
+**If error (TASKS.json not found or empty):**
 Show the error message from task-manager and stop.
 
 **If successful:**
@@ -103,21 +103,99 @@ Show the warning message from task-manager and **stop** - wait for user to resol
 
 4. **Based on verification result:**
 
+   **Log verification** to `.claude/shipspec-debug.log`:
+   ```
+   $(date -u +%Y-%m-%dT%H:%M:%SZ) | [task-id] | VERIFY | [result] | [details]
+   ```
+
    **If VERIFIED:**
-   - Update task status from `[~]` to `[x]` in TASKS.md
+   - Update task status to `completed`:
+     - Delegate to `task-manager` with operation `update_status`, task ID, and new status `completed`
+   - **Log task completion** to `.claude/shipspec-debug.log`:
+     ```
+     $(date -u +%Y-%m-%dT%H:%M:%SZ) | [task-id] | COMPLETE | Status updated to completed
+     ```
+   - **Clean up any existing feature retry state:**
+     ```bash
+     rm -f .shipspec/planning/$ARGUMENTS/feature-retry.local.json .shipspec/active-loop.local.json
+     ```
+   - **Output completion marker:**
+     `<feature-task-complete>VERIFIED</feature-task-complete>`
    - Tell user: "Task [TASK-ID] verified complete! Marking as done and continuing..."
    - Continue to Step 4 (main loop)
 
-   **If INCOMPLETE or BLOCKED:**
+   **If INCOMPLETE:**
    - Tell user: "Task [TASK-ID] not yet complete. Continuing implementation..."
+   - **Create feature retry state files** for auto-retry (only if not already retrying this task):
+     ```bash
+     POINTER_FILE=".shipspec/active-loop.local.json"
+     STATE_FILE=".shipspec/planning/$ARGUMENTS/feature-retry.local.json"
+     # Check if we're already retrying the SAME task (preserve counter for retry)
+     EXISTING_TASK=$(jq -r '.current_task_id // empty' "$STATE_FILE" 2>/dev/null || echo "")
+     if [[ "$EXISTING_TASK" != "[task-id]" ]]; then
+       # New task or no state file - create fresh with counter=1
+       # Create pointer file (JSON format)
+       cat > "$POINTER_FILE" << 'EOF'
+     {
+       "feature": "$ARGUMENTS",
+       "loop_type": "feature-retry",
+       "state_path": ".shipspec/planning/$ARGUMENTS/feature-retry.local.json",
+       "created_at": "[ISO timestamp]"
+     }
+     EOF
+       # Create state file in feature directory (JSON format)
+       cat > "$STATE_FILE" << 'EOF'
+     {
+       "active": true,
+       "feature": "$ARGUMENTS",
+       "current_task_id": "[task-id]",
+       "task_attempt": 1,
+       "max_task_attempts": 5,
+       "total_tasks": [total count],
+       "tasks_completed": [completed count],
+       "started_at": "[ISO timestamp]"
+     }
+     EOF
+     fi
+     # If same task, skip creation - hook will increment counter
+     ```
    - **IMPLEMENT THE TASK**:
      - Read the task prompt carefully
      - Identify files to create or modify
      - Write the actual code following the implementation notes
      - Run any specified build/test commands as you implement
      - Follow the acceptance criteria to guide what needs to be done
-   - Mark as `[x]` when implementation is complete
-   - Continue to Step 4 (main loop)
+   - After implementation, delegate to `task-verifier` to verify the task
+   - **If VERIFIED after implementation:**
+     - Update task status to `completed`:
+       - Delegate to `task-manager` with operation `update_status`, task ID, and new status `completed`
+     - Log task completion
+     - Clean up state file: `rm -f .shipspec/planning/$ARGUMENTS/feature-retry.local.json .shipspec/active-loop.local.json`
+     - Output: `<feature-task-complete>VERIFIED</feature-task-complete>`
+     - Continue to Step 4 (main loop)
+   - **If still INCOMPLETE:**
+     - DO NOT output completion marker (stop hook will trigger retry)
+     - Show what failed to user
+
+   - **If BLOCKED after implementation:**
+     - **Clean up state file:**
+       ```bash
+       rm -f .shipspec/planning/$ARGUMENTS/feature-retry.local.json .shipspec/active-loop.local.json
+       ```
+     - **Output blocked marker:**
+       `<feature-task-complete>BLOCKED</feature-task-complete>`
+     - Tell user: "Task [TASK-ID] is blocked: [reason]. Manual intervention required."
+     - Ask user how to proceed (skip task, abort feature, or manual fix)
+
+   **If BLOCKED:**
+   - **Clean up any existing feature retry state:**
+     ```bash
+     rm -f .shipspec/planning/$ARGUMENTS/feature-retry.local.json .shipspec/active-loop.local.json
+     ```
+   - **Output blocked marker:**
+     `<feature-task-complete>BLOCKED</feature-task-complete>`
+   - Tell user: "Task [TASK-ID] is blocked: [reason]. Manual intervention required."
+   - Ask user how to proceed (skip task, abort feature, or manual fix)
 
 **If NONE:**
 Continue to Step 4 (main loop).
@@ -140,7 +218,7 @@ Show the blocked tasks table from task-manager:
 >
 > No tasks are currently ready. [Show blocked tasks from task-manager response]
 >
-> This may indicate a circular dependency or missing task. Please review TASKS.md."
+> This may indicate a circular dependency or missing task. Please review TASKS.json."
 
 **Stop the loop** - ask user how to proceed.
 
@@ -154,10 +232,15 @@ Continue to Step 4.3 with the returned task.
 
 Once a ready task is found:
 
-1. **Update TASKS.md**: Change status from `[ ]` to `[~]`
-   - Find `### - [ ] TASK-XXX:` -> Replace with `### - [~] TASK-XXX:`
+1. **Update task status** to `in_progress`:
+   - Delegate to `task-manager` with operation `update_status`, task ID, and new status `in_progress`
 
-2. **Display task header**:
+2. **Log task start** to `.claude/shipspec-debug.log`:
+   ```
+   $(date -u +%Y-%m-%dT%H:%M:%SZ) | [task-id] | START | [X/TOTAL] [title]
+   ```
+
+3. **Display task header**:
 > "---
 >
 > ## [X/TOTAL] Implementing: [TASK-ID] - [Title]
@@ -166,21 +249,82 @@ Once a ready task is found:
 >
 > ---"
 
-3. **Get full task prompt** by delegating to `task-manager` with:
+4. **Get full task prompt** by delegating to `task-manager` with:
    - Feature name: $ARGUMENTS
    - Operation: `get_task`
    - Task ID: [the ready task ID from step 4.1]
 
-4. **IMPLEMENT THE TASK**:
+5. **Create feature retry state files** for auto-retry on failure (only if not already retrying this task):
+   ```bash
+   POINTER_FILE=".shipspec/active-loop.local.json"
+   STATE_FILE=".shipspec/planning/$ARGUMENTS/feature-retry.local.json"
+   # Check if we're already retrying the SAME task (preserve counter for retry)
+   EXISTING_TASK=$(jq -r '.current_task_id // empty' "$STATE_FILE" 2>/dev/null || echo "")
+   if [[ "$EXISTING_TASK" != "[task-id]" ]]; then
+     # New task or no state file - create fresh with counter=1
+     # Create pointer file (JSON format)
+     cat > "$POINTER_FILE" << 'EOF'
+   {
+     "feature": "$ARGUMENTS",
+     "loop_type": "feature-retry",
+     "state_path": ".shipspec/planning/$ARGUMENTS/feature-retry.local.json",
+     "created_at": "[ISO timestamp]"
+   }
+   EOF
+     # Create state file in feature directory (JSON format)
+     cat > "$STATE_FILE" << 'EOF'
+   {
+     "active": true,
+     "feature": "$ARGUMENTS",
+     "current_task_id": "[task-id]",
+     "task_attempt": 1,
+     "max_task_attempts": 5,
+     "total_tasks": [total count],
+     "tasks_completed": [completed count],
+     "started_at": "[ISO timestamp]"
+   }
+   EOF
+   fi
+   # If same task, skip creation - hook will increment counter
+   ```
+
+6. **IMPLEMENT THE TASK**:
    - Read the task prompt carefully
    - Identify files to create or modify
    - Write the actual code following the implementation notes
    - Run any specified build/test commands as you implement
    - Follow the acceptance criteria to guide what needs to be done
 
-5. **Mark task complete**: After implementation, update TASKS.md from `[~]` to `[x]`
+### 4.4: Verify and Handle Result
 
-6. **Show progress**:
+After implementation, verify the task:
+
+1. **Delegate to task-verifier** agent with:
+   - The full task prompt including acceptance criteria
+   - The feature name ($ARGUMENTS)
+   - The task ID
+
+2. **Log verification** to `.claude/shipspec-debug.log`:
+   ```
+   $(date -u +%Y-%m-%dT%H:%M:%SZ) | [task-id] | VERIFY | [result] | [details]
+   ```
+
+3. **Handle verification result:**
+
+**If VERIFIED:**
+- Update task status to `completed`:
+  - Delegate to `task-manager` with operation `update_status`, task ID, and new status `completed`
+- **Log task completion** to `.claude/shipspec-debug.log`:
+  ```
+  $(date -u +%Y-%m-%dT%H:%M:%SZ) | [task-id] | COMPLETE | Status updated to completed
+  ```
+- **Clean up state file:**
+  ```bash
+  rm -f .shipspec/planning/$ARGUMENTS/feature-retry.local.json .shipspec/active-loop.local.json
+  ```
+- **Output completion marker:**
+  `<feature-task-complete>VERIFIED</feature-task-complete>`
+- **Show progress**:
 > "**Progress: [X/TOTAL]**
 >
 > | Status | Count |
@@ -188,15 +332,40 @@ Once a ready task is found:
 > | Completed | X |
 > | Remaining | Y |
 >
-> *Continuing to next task...*"
+> *Task verified! Continuing to next task...*"
+- Return to Step 4.1 to find the next task.
 
-7. Return to Step 4.1 to find the next task.
+**If INCOMPLETE:**
+- DO NOT output completion marker (stop hook will trigger retry)
+- Keep task as `in_progress` (no status change needed)
+- Show what failed to user:
+> "**Verification Failed**
+>
+> The following criteria are not met:
+> - [List failed criteria]
+>
+> The loop will retry automatically."
+
+**If BLOCKED:**
+- **Clean up state file:**
+  ```bash
+  rm -f .shipspec/planning/$ARGUMENTS/feature-retry.local.json .shipspec/active-loop.local.json
+  ```
+- **Output blocked marker:**
+  `<feature-task-complete>BLOCKED</feature-task-complete>`
+- Tell user: "Task [TASK-ID] is blocked: [reason]. Manual intervention required."
+- Ask user how to proceed (skip task, abort feature, or manual fix)
 
 ---
 
 ## Step 5: Final Feature Review
 
 After all tasks are marked complete, perform a comprehensive review of the entire feature implementation.
+
+**Clean up any remaining state file:**
+```bash
+rm -f .shipspec/planning/$ARGUMENTS/feature-retry.local.json .shipspec/active-loop.local.json
+```
 
 > "## All Tasks Implemented!
 >
@@ -210,13 +379,16 @@ Load the PRD and SDD for reference:
 
 ### 5.2: Validate All Acceptance Criteria
 
-For each task in TASKS.md that is marked `[x]` (completed):
+For each task in TASKS.json that has status `completed`:
 
-1. Extract the full task prompt (from task header to next task header)
+1. Get the task details from TASKS.json:
+   ```bash
+   jq -r '.tasks["TASK-XXX"]' .shipspec/planning/$ARGUMENTS/TASKS.json
+   ```
 2. Delegate to the `task-verifier` agent with:
-   - The full task prompt including acceptance criteria
-   - The feature name ($ARGUMENTS)
    - The task ID
+   - The feature name ($ARGUMENTS)
+   - The full task prompt for context
 3. Record the verification result (VERIFIED, INCOMPLETE, or BLOCKED)
 
 **Aggregate results into a summary:**
@@ -237,19 +409,23 @@ If any task is INCOMPLETE, collect all failed criteria for the final report in S
 
 ### 5.3: Validate Planning Alignment (Design & Requirements)
 
-For each task in TASKS.md that is marked `[x]` (completed) AND has a `## References` section:
+For each task in TASKS.json that has status `completed` AND has non-empty `prd_refs` or `sdd_refs` arrays:
 
-1. Delegate to the `planning-validator` agent with:
+1. Check if task has planning references:
+   ```bash
+   jq -r '.tasks["TASK-XXX"] | (.prd_refs | length), (.sdd_refs | length)' .shipspec/planning/$ARGUMENTS/TASKS.json
+   ```
+
+2. If either array is non-empty, delegate to the `planning-validator` agent with:
    - The task ID
    - The feature name ($ARGUMENTS)
-   - The task's References section (containing SDD sections and PRD requirements)
 
-2. Record the validation result:
+3. Record the validation result:
    - **ALIGNED**: Implementation matches design and requirements
    - **MISALIGNED**: Implementation doesn't match (collect specific issues)
    - **UNVERIFIED**: References not found (track in `missing_references` list)
 
-3. Aggregate results from all tasks
+4. Aggregate results from all tasks
 
 **Output Format:**
 
@@ -277,7 +453,7 @@ For each task in TASKS.md that is marked `[x]` (completed) AND has a `## Referen
 **Result:** X/Y requirements satisfied
 ```
 
-**Note:** Tasks without a References section are skipped for planning validation (they still go through acceptance criteria validation in 5.2).
+**Note:** Tasks without prd_refs and sdd_refs arrays are skipped for planning validation (they still go through acceptance criteria validation in 5.2).
 
 ### 5.4: Generate Final Verdict
 
@@ -323,6 +499,11 @@ Compile results from all three validation categories:
 - AND no explicit FAILED criteria exist (otherwise it's NEEDS WORK)
 - Examples: missing test infrastructure, cannot run type checker, missing acceptance criteria
 
+**Log final review result** to `.claude/shipspec-debug.log`:
+```
+$(date -u +%Y-%m-%dT%H:%M:%SZ) | FEATURE | REVIEW | [verdict] | [summary e.g., "5/5 tasks verified" or "2 criteria failed"]
+```
+
 ### 5.5: Take Action Based on Verdict
 
 **If APPROVED:**
@@ -341,6 +522,9 @@ Compile results from all three validation categories:
 > - Review the changes: `git diff`
 > - Commit your changes: `git add . && git commit -m "Implement $ARGUMENTS feature"`
 > - Create a pull request if needed"
+
+**Output feature complete marker:**
+`<feature-complete>APPROVED</feature-complete>`
 
 **If APPROVED WITH WARNINGS:**
 
@@ -364,12 +548,15 @@ Compile results from all three validation categories:
 > **Action Required:**
 > Please manually verify these references are either:
 > 1. No longer relevant (safe to ignore)
-> 2. Need to be updated in TASKS.md, PRD.md, or SDD.md
+> 2. Need to be updated in TASKS.json, PRD.md, or SDD.md
 >
 > **Next Steps:**
 > - Review the unverified references above
 > - If satisfied, proceed with: `git add . && git commit -m "Implement $ARGUMENTS feature"`
 > - If references need fixing, update the planning artifacts and re-run `/implement-feature $ARGUMENTS`"
+
+**Output feature complete marker:**
+`<feature-complete>APPROVED_WITH_WARNINGS</feature-complete>`
 
 **If NEEDS WORK:**
 
@@ -406,7 +593,7 @@ Compile results from all three validation categories:
 >
 > **Common Resolutions:**
 > - **Missing test infrastructure**: Set up testing framework (e.g., `npm init jest`, `pytest`)
-> - **Missing acceptance criteria**: Add acceptance criteria to tasks in TASKS.md
+> - **Missing acceptance criteria**: Add acceptance criteria to tasks in TASKS.json
 > - **Missing type checker**: Install and configure type checking (e.g., TypeScript, mypy)
 >
 > After resolving the blocking issues, run `/implement-feature $ARGUMENTS` again."
@@ -425,7 +612,7 @@ If a task prompt is too vague to implement:
 > **Options:**
 > 1. I'll make reasonable assumptions and implement
 > 2. Skip this task
-> 3. Stop so you can clarify the task in TASKS.md"
+> 3. Stop so you can clarify the task in TASKS.json"
 
 ### Build/Test Failures During Implementation
 If running build or tests fails during implementation:
@@ -451,7 +638,7 @@ If the project doesn't have a type checker or linter configured:
 
 ## Important Notes
 
-1. **Save progress frequently**: Update TASKS.md after each task completion so progress survives interruptions
+1. **Save progress frequently**: Update TASKS.json after each task completion so progress survives interruptions
 2. **Be thorough**: Implement each task fully before marking complete
 3. **Read context**: Use PRD.md and SDD.md in the feature directory for additional context
 4. **Follow patterns**: Look at existing code in the codebase for consistent patterns

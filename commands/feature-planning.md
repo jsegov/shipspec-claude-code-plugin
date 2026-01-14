@@ -1,7 +1,7 @@
 ---
 description: Start planning a new feature with AI-assisted PRD generation
 argument-hint: [feature-description]
-allowed-tools: Read, Glob, Grep, Write, Bash(git status), Bash(git log:*), Bash(find:*), Bash(ls:*), Bash(cat:*), Bash(head:*), Bash(mkdir:*), Bash(rm:*), Task, AskUserQuestion
+allowed-tools: Read, Glob, Grep, Write, Bash(git status), Bash(git log:*), Bash(find:*), Bash(ls:*), Bash(cat:*), Bash(head:*), Bash(mkdir:*), Bash(rm:*), Bash(jq:*), Task, AskUserQuestion
 ---
 
 # Feature Planning
@@ -17,7 +17,7 @@ This command runs through 7 phases:
 4. **PRD Generation** - Generate PRD and pause for user review
 5. **Technical Decisions** - Interactive Q&A with design-architect agent
 6. **SDD Generation** - Generate SDD and pause for user review
-7. **Task Generation** - Automatically generate implementation tasks
+7. **Task Generation** - Automatically generate implementation tasks (TASKS.json + TASKS.md)
 
 ---
 
@@ -289,26 +289,34 @@ Delegate to the `task-planner` subagent to:
 - Create detailed agent prompts for each task
 - Group into execution phases
 
-Using the agent-prompts skill, create a comprehensive task list with:
+Using the agent-prompts skill, create comprehensive task files:
 
-1. **Summary**
-   - Total tasks and story points
-   - Estimated duration
-   - Critical path
+1. **TASKS.json** - Machine-parseable metadata
+   - Version and feature name
+   - Summary (total tasks, points, critical path)
+   - Phases array
+   - Tasks object with all metadata:
+     - title, status, phase, points
+     - depends_on, blocks arrays
+     - prd_refs, sdd_refs arrays
+     - acceptance_criteria, testing arrays
+     - prompt field (full implementation prompt)
+
+2. **TASKS.md** - Human-readable task prompts
+   - Summary section
    - Requirement coverage matrix
+   - Phase groupings
+   - Individual tasks with:
+     - Context
+     - Requirements (prose)
+     - Technical Approach
+     - Files to Create/Modify
+     - Key Interfaces
+     - Constraints
 
-2. **Execution Phases**
-   - Phase 1: Foundation (schema, types)
-   - Phase 2: Core Implementation (APIs, services)
-   - Phase 3: UI Layer (components, pages)
-   - Phase 4: Polish (tests, docs)
-
-3. **Individual Tasks**
-   - Each with full agent prompt
-   - Dependencies clearly marked
-   - Acceptance criteria
-
-Save the tasks to: `.shipspec/planning/[FEATURE_DIR]/TASKS.md`
+Save to:
+- `.shipspec/planning/[FEATURE_DIR]/TASKS.json`
+- `.shipspec/planning/[FEATURE_DIR]/TASKS.md`
 
 ### Cleanup Temporary Files
 
@@ -319,7 +327,142 @@ rm -f .shipspec/planning/[FEATURE_DIR]/context.md
 rm -f .shipspec/planning/[FEATURE_DIR]/description.txt
 ```
 
-The context and description are now incorporated into the PRD, SDD, and TASKS.md files.
+The context and description are now incorporated into the PRD, SDD, and task files.
+
+---
+
+## Phase 8: Task Refinement (Optional)
+
+After generating TASKS.json, analyze task complexity to identify tasks that may be too large.
+
+### 8.1: Identify Large Tasks
+
+Parse TASKS.json and find tasks with estimated effort > 5 story points:
+
+```bash
+jq -r '.tasks | to_entries[] | select(.value.points > 5) | "\(.key): \(.value.title) (\(.value.points) points)"' .shipspec/planning/[FEATURE_DIR]/TASKS.json
+```
+
+**If no large tasks found:**
+> "All tasks are appropriately sized (≤5 story points). Skipping refinement."
+
+Skip to Completion Summary.
+
+**If large tasks found:**
+
+Show user:
+> "## Task Size Analysis
+>
+> Found **X tasks** with estimated effort > 5 story points:
+>
+> | Task | Title | Story Points |
+> |------|-------|--------------|
+> | TASK-003 | [Title] | 8 |
+> | TASK-007 | [Title] | 13 |
+>
+> Large tasks are harder to implement and verify. Would you like to auto-refine them into smaller subtasks?"
+
+Use AskUserQuestion with options:
+- "Yes, auto-refine large tasks"
+- "No, keep current breakdown"
+
+**If user chooses No:** Skip to Completion Summary.
+
+### 8.2: Initialize Refinement Loop
+
+Create state files (JSON format):
+```bash
+# Create pointer file
+cat > .shipspec/active-loop.local.json << 'EOF'
+{
+  "feature": "[FEATURE_DIR]",
+  "loop_type": "planning-refine",
+  "state_path": ".shipspec/planning/[FEATURE_DIR]/planning-refine.local.json",
+  "created_at": "[ISO timestamp]"
+}
+EOF
+
+# Create state file in feature directory
+cat > .shipspec/planning/[FEATURE_DIR]/planning-refine.local.json << 'EOF'
+{
+  "active": true,
+  "feature": "[FEATURE_DIR]",
+  "iteration": 1,
+  "max_iterations": 3,
+  "large_tasks": ["TASK-003", "TASK-007"],
+  "tasks_refined": 0,
+  "started_at": "[ISO timestamp]"
+}
+EOF
+```
+
+### 8.3: Refine Each Large Task
+
+For each task in large_tasks:
+
+1. Get full task details from TASKS.json:
+   ```bash
+   jq -r '.tasks["TASK-XXX"]' .shipspec/planning/[FEATURE_DIR]/TASKS.json
+   ```
+
+2. Delegate to `task-planner` agent:
+   > "Break down TASK-XXX into 2-3 subtasks.
+   >
+   > Original task:
+   > [task prompt]
+   >
+   > Requirements:
+   > - Each subtask should be < 3 story points
+   > - Preserve the original acceptance criteria distributed across subtasks
+   > - Maintain dependency relationships
+   > - Use format TASK-XXX-A, TASK-XXX-B, etc. for subtask IDs"
+
+3. Replace original task with generated subtasks in TASKS.json and TASKS.md
+4. Update dependencies pointing to original task
+5. Run task-manager validate to check no circular deps
+
+**If validation fails:**
+- Rollback changes
+- Mark task as "cannot refine"
+- Continue to next large task
+
+### 8.4: Check Completion
+
+After processing all large tasks:
+
+1. Re-analyze TASKS.json for tasks > 5 points:
+   ```bash
+   jq '[.tasks | to_entries[] | select(.value.points > 5)] | length' .shipspec/planning/[FEATURE_DIR]/TASKS.json
+   ```
+2. If still have large tasks AND iteration < max_iterations:
+   - Increment iteration in state file:
+     ```bash
+     jq '.iteration += 1' .shipspec/planning/[FEATURE_DIR]/planning-refine.local.json > tmp && mv tmp .shipspec/planning/[FEATURE_DIR]/planning-refine.local.json
+     ```
+   - Add new large tasks to list
+   - Return to 8.3
+3. If no more large tasks OR max iterations:
+   - Clean up state file
+   - Show summary
+
+### 8.5: Summary
+
+> "## Task Refinement Complete
+>
+> **Results:**
+> - Original large tasks: X
+> - Successfully refined: Y
+> - Could not refine: Z
+>
+> **New task count:** N (was M)"
+
+**Output completion marker:**
+`<planning-refine-complete>`
+
+Clean up:
+```bash
+rm -f .shipspec/planning/[FEATURE_DIR]/planning-refine.local.json .shipspec/active-loop.local.json
+```
 
 ---
 
@@ -340,7 +483,8 @@ After all phases complete, provide:
 > **Generated Documents:**
 > - `.shipspec/planning/[FEATURE_DIR]/PRD.md` - Product requirements
 > - `.shipspec/planning/[FEATURE_DIR]/SDD.md` - Technical design
-> - `.shipspec/planning/[FEATURE_DIR]/TASKS.md` - Implementation tasks
+> - `.shipspec/planning/[FEATURE_DIR]/TASKS.json` - Task metadata (machine-parseable)
+> - `.shipspec/planning/[FEATURE_DIR]/TASKS.md` - Task prompts (human-readable)
 >
 > **Next Steps:**
 > Run `/implement-task [FEATURE_DIR]` to start implementing the first task.

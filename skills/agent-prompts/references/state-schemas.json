@@ -1,0 +1,168 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://shipspec.dev/schemas/state.json",
+  "title": "Loop State File Schemas",
+  "description": "Schemas for Ralph Loop state files",
+
+  "$defs": {
+    "task-loop": {
+      "title": "Task Loop State",
+      "description": "State for per-task auto-retry loop",
+      "type": "object",
+      "required": ["active", "feature", "task_id", "iteration", "max_iterations", "started_at"],
+      "properties": {
+        "active": {
+          "type": "boolean",
+          "description": "Whether the loop is currently active"
+        },
+        "feature": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+          "description": "Feature name (kebab-case)"
+        },
+        "task_id": {
+          "type": "string",
+          "pattern": "^TASK-[0-9]{3}$",
+          "description": "Current task being implemented"
+        },
+        "iteration": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Current retry iteration"
+        },
+        "max_iterations": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 5,
+          "description": "Maximum retry attempts before escalation"
+        },
+        "started_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 timestamp when loop started"
+        }
+      }
+    },
+
+    "feature-retry": {
+      "title": "Feature Retry State",
+      "description": "State for feature-wide implementation with per-task retry",
+      "type": "object",
+      "required": ["active", "feature", "current_task_id", "task_attempt", "max_task_attempts", "tasks_completed", "total_tasks", "started_at"],
+      "properties": {
+        "active": {
+          "type": "boolean",
+          "description": "Whether the loop is currently active"
+        },
+        "feature": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+          "description": "Feature name (kebab-case)"
+        },
+        "current_task_id": {
+          "type": "string",
+          "pattern": "^TASK-[0-9]{3}$",
+          "description": "Currently active task being implemented"
+        },
+        "task_attempt": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Current retry attempt for the current task"
+        },
+        "max_task_attempts": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 5,
+          "description": "Maximum retry attempts per task"
+        },
+        "tasks_completed": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of tasks already completed"
+        },
+        "total_tasks": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Total number of tasks in the feature"
+        },
+        "started_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 timestamp when loop started"
+        }
+      }
+    },
+
+    "planning-refine": {
+      "title": "Planning Refinement State",
+      "description": "State for large task auto-refinement loop",
+      "type": "object",
+      "required": ["active", "feature", "iteration", "max_iterations", "large_tasks", "tasks_refined", "started_at"],
+      "properties": {
+        "active": {
+          "type": "boolean",
+          "description": "Whether the refinement loop is active"
+        },
+        "feature": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+          "description": "Feature name (kebab-case)"
+        },
+        "iteration": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Current refinement iteration"
+        },
+        "max_iterations": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 3,
+          "description": "Maximum refinement iterations"
+        },
+        "large_tasks": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^TASK-[0-9]{3}$"
+          },
+          "description": "Task IDs with >5 story points needing refinement"
+        },
+        "tasks_refined": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of tasks successfully refined so far"
+        },
+        "started_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 timestamp when refinement started"
+        }
+      }
+    },
+
+    "active-loop-pointer": {
+      "title": "Active Loop Pointer",
+      "description": "Pointer file indicating which loop is currently active",
+      "type": "object",
+      "required": ["feature", "loop_type", "state_path", "created_at"],
+      "properties": {
+        "feature": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+        },
+        "loop_type": {
+          "type": "string",
+          "enum": ["task-loop", "feature-retry", "planning-refine"]
+        },
+        "state_path": {
+          "type": "string",
+          "description": "Path to the state file relative to project root"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    }
+  }
+}

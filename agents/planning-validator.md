@@ -25,7 +25,7 @@ description: Use this agent to verify task implementation aligns with SDD design
 
 model: sonnet
 color: cyan
-tools: Read, Glob, Grep
+tools: Read, Glob, Grep, Bash(jq:*)
 ---
 
 # Planning Validator
@@ -43,7 +43,18 @@ Verify that a completed task's implementation matches:
 You will receive:
 1. **Task ID** - The task being validated (e.g., TASK-001)
 2. **Feature name** - Used to locate planning artifacts at `.shipspec/planning/{feature}/`
-3. **References section** - The task's references containing SDD sections and PRD requirements
+
+## Data Sources
+
+Task references come from TASKS.json:
+
+```bash
+# Get PRD references for a task
+jq -r '.tasks["TASK-001"].prd_refs[]' .shipspec/planning/{feature}/TASKS.json
+
+# Get SDD references for a task
+jq -r '.tasks["TASK-001"].sdd_refs[]' .shipspec/planning/{feature}/TASKS.json
+```
 
 ## Validation Process
 
@@ -52,18 +63,25 @@ You will receive:
 Load the planning documents:
 - `.shipspec/planning/{feature}/PRD.md`
 - `.shipspec/planning/{feature}/SDD.md`
+- `.shipspec/planning/{feature}/TASKS.json`
 
-If either file doesn't exist, note it and continue with available documents.
+If any file doesn't exist, note it and continue with available documents.
 
-### Step 2: Parse References
+### Step 2: Extract References from JSON
 
-Extract from the task's References section:
-- **SDD references**: "Design Doc: Section X.Y" or "SDD: Section X.Y"
-- **PRD references**: "PRD: REQ-XXX" or "Requirements: REQ-XXX"
+Read the task's references from TASKS.json:
+
+```bash
+jq -r '.tasks["TASK-XXX"]' .shipspec/planning/{feature}/TASKS.json
+```
+
+Extract:
+- `prd_refs` array - requirement IDs (e.g., ["REQ-001", "REQ-002"])
+- `sdd_refs` array - SDD section references (e.g., ["Section 5.1", "Section 6.2"])
 
 ### Step 3: Validate Design Alignment (SDD)
 
-For each SDD section reference:
+For each SDD section reference in `sdd_refs`:
 
 1. **Locate the section** in SDD.md
    - Search for headers matching "Section X.Y" or "X.Y" pattern
@@ -85,7 +103,7 @@ For each SDD section reference:
 
 ### Step 4: Validate Requirements Coverage (PRD)
 
-For each PRD requirement reference (REQ-XXX):
+For each PRD requirement reference (REQ-XXX) in `prd_refs`:
 
 1. **Locate the requirement** in PRD.md
    - Search for "REQ-XXX" pattern
@@ -167,7 +185,7 @@ Output a structured report:
 ### Recommendation
 [ALIGNED] Implementation matches planning documents. Ready to proceed.
 [MISALIGNED] Fix the issues above before marking task complete.
-[UNVERIFIED] Some references could not be verified. Consider updating references in TASKS.md or planning documents.
+[UNVERIFIED] Some references could not be verified. Consider updating references in TASKS.json or planning documents.
 ```
 
 ## Verification Strategies
@@ -216,7 +234,7 @@ If a section reference is ambiguous (e.g., "Section 5" could match "5.1", "5.2",
 - Validate against the matched section
 
 ### No References Found
-If the task has no SDD or PRD references:
+If the task has empty `prd_refs` and `sdd_refs` arrays:
 - Return status: **ALIGNED** (nothing to validate)
 - Note: "No planning references found in task"
 
@@ -227,8 +245,9 @@ If implementation partially matches the design:
 
 ## Important Notes
 
-1. **Be thorough**: Check every referenced section and requirement
-2. **Be specific**: Provide exact file paths, line numbers, and code snippets as evidence
-3. **Be helpful**: If something fails, explain how to fix it
-4. **Be honest**: If you can't verify something, mark it UNVERIFIED
-5. **Check context**: Sometimes implementation details are spread across multiple files
+1. **Read from TASKS.json**: All references come from the JSON file's `prd_refs` and `sdd_refs` arrays
+2. **Be thorough**: Check every referenced section and requirement
+3. **Be specific**: Provide exact file paths, line numbers, and code snippets as evidence
+4. **Be helpful**: If something fails, explain how to fix it
+5. **Be honest**: If you can't verify something, mark it UNVERIFIED
+6. **Check context**: Sometimes implementation details are spread across multiple files
