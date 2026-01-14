@@ -164,25 +164,14 @@ if [[ "$MAX_ITERATIONS" == "0" ]]; then
   MAX_DISPLAY="unlimited"
 fi
 
-if [[ $NEXT_ITERATION -eq 2 ]]; then
-  # First retry - task was just displayed, no verification occurred
-  SYSTEM_MSG="🔄 **Task Loop: Attempt $NEXT_ITERATION/$MAX_DISPLAY**
+# All retries are post-verification failures (verification always runs before hook triggers)
+SYSTEM_MSG="🔄 **Task Loop: Attempt $NEXT_ITERATION/$MAX_DISPLAY**
 
 **Task:** $TASK_ID
 **Feature:** $FEATURE
-
-Continue implementing the task. When done, run task-verifier to check completion."
-else
-  # Subsequent retries - verification actually ran and failed
-  SYSTEM_MSG="🔄 **Task Loop: Attempt $NEXT_ITERATION/$MAX_DISPLAY**
 
 Previous attempt did not pass all acceptance criteria.
-
-**Task:** $TASK_ID
-**Feature:** $FEATURE
-
 Review what failed and continue implementation. When done, run task-verifier to check completion."
-fi
 
 # Return block decision - feed original prompt back for another attempt
 jq -n \

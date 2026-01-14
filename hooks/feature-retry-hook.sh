@@ -164,18 +164,8 @@ if [[ "$MAX_ATTEMPTS" == "0" ]]; then
   MAX_DISPLAY="unlimited"
 fi
 
-if [[ $NEXT_ATTEMPT -eq 2 ]]; then
-  # First retry - task was just started
-  SYSTEM_MSG="🔄 **Feature Implementation: Task Retry**
-
-**Feature:** $FEATURE
-**Task:** $TASK_ID (Attempt $NEXT_ATTEMPT/$MAX_DISPLAY)
-**Progress:** $TASKS_COMPLETED/$TOTAL_TASKS tasks completed
-
-Continue implementing the task."
-else
-  # Subsequent retries - verification ran and failed
-  SYSTEM_MSG="🔄 **Feature Implementation: Task Retry**
+# All retries are post-verification failures (verification always runs before hook triggers)
+SYSTEM_MSG="🔄 **Feature Implementation: Task Retry**
 
 **Feature:** $FEATURE
 **Task:** $TASK_ID (Attempt $NEXT_ATTEMPT/$MAX_DISPLAY)
@@ -183,7 +173,6 @@ else
 
 Previous attempt did not pass all acceptance criteria.
 Review what failed and fix the implementation."
-fi
 
 # Return block decision - feed original prompt back for another attempt
 jq -n \
